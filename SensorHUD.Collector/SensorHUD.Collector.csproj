@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!--
+      Unsigned UAC prompts display the physical executable name rather than
+      the version-resource description, so keep the shipped filename human
+      readable. RootNamespace preserves the existing source namespaces.
+    -->
+    <AssemblyName>SensorHUD Data Collector</AssemblyName>
+    <RootNamespace>SensorHUD.Collector</RootNamespace>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.18362.0</TargetPlatformMinVersion>
+    <!-- Keep Visual Studio's live platform analyzer aligned with the MSIX minimum OS. -->
+    <SupportedOSPlatformVersion>10.0.18362.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and ('$(Platform)' == '' or '$(Platform)' == 'AnyCPU')">win-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-$(Platform)</RuntimeIdentifier>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\SensorHUD.ico</ApplicationIcon>
+
+    <!--
+      These values are embedded in the executable's Windows version resource.
+      They give elevation prompts and file properties a recognizable product
+      identity even in unsigned development builds.
+    -->
+    <AssemblyTitle>SensorHUD Data Collector</AssemblyTitle>
+    <Product>SensorHUD for Xbox Game Bar</Product>
+    <Company>yoqzii</Company>
+    <Description>Collects local hardware telemetry for the SensorHUD Xbox Game Bar widget.</Description>
+    <Copyright>Copyright © 2026 yoqzii</Copyright>
+
+    <!--
+      The collector is self-contained so a sideloaded installation does not
+      require a separate .NET runtime. It remains completely windowless.
+    -->
+    <SelfContained>true</SelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Shared\SensorHUD.Shared.csproj" />
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+    <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.2.5" />
+    <!-- Official signed PawnIO 2.2.0 installer, redistributed unmodified. -->
+    <Content Include="..\Dependencies\PawnIO\PawnIO_setup.exe"
+             Link="PawnIO_setup.exe"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Keep the partial hardware-provider implementation grouped in the IDE. -->
+    <Compile Update="Sampling\Providers\HardwareSensorProvider.Sensors.cs">
+      <DependentUpon>HardwareSensorProvider.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Sampling\Providers\HardwareSensorProvider.Errors.cs">
+      <DependentUpon>HardwareSensorProvider.cs</DependentUpon>
+    </Compile>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,27 @@
+SensorHUD - Privacy Policy
+Last updated: July 28, 2026
+
+SensorHUD reads hardware performance information from the local Windows device
+so it can display that information in an Xbox Game Bar widget.
+
+Data handling
+
+- Hardware readings and device names are processed locally on the device.
+- The application does not transmit telemetry readings or device information
+  to the developer or to third parties.
+- The application does not contain advertising, analytics, user accounts, or
+  cloud synchronization.
+- Display preferences are stored only in the application's local package
+  storage.
+
+Hardware access
+
+The application uses the signed PawnIO hardware-access driver for supported
+low-level sensors. Its installer is included in the application package and is
+run only when the required driver is missing, damaged, or outdated.
+
+Questions
+
+Privacy questions can be submitted through the issue tracker of the repository
+that hosts this policy. Do not include private or sensitive information in a
+public issue.

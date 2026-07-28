@@ -1,0 +1,148 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <WindowsSdkPackageVersion>10.0.26100.87</WindowsSdkPackageVersion>
+    <TargetPlatformMinVersion>10.0.18362.0</TargetPlatformMinVersion>
+    <!-- Keep Visual Studio's live platform analyzer aligned with the MSIX minimum OS. -->
+    <SupportedOSPlatformVersion>10.0.18362.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <UseUwp>true</UseUwp>
+    <!-- Version 0.0.1 is distributed for 64-bit Intel/AMD Windows PCs. -->
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <PublishAot>true</PublishAot>
+    <PublishProfile>win-$(Platform).pubxml</PublishProfile>
+    <DisableRuntimeMarshalling>true</DisableRuntimeMarshalling>
+    <EnableMsixTooling>true</EnableMsixTooling>
+
+    <!--
+      Xbox Game Bar currently ships its contract as WinMD metadata. Modern
+      .NET consumes third-party WinMDs through a generated C#/WinRT projection.
+    -->
+    <CsWinRTIncludes>Microsoft.Gaming.XboxGameBar</CsWinRTIncludes>
+    <!--
+      Game Bar's contract references Windows.UI.Xaml types. The installed UWP
+      union metadata supplies those definitions to the projection generator.
+    -->
+    <CsWinRTWindowsMetadata>&quot;$(MSBuildProgramFiles32)\Windows Kits\10\UnionMetadata\10.0.26100.0\Windows.winmd&quot;</CsWinRTWindowsMetadata>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- This is the official SDK used to host UWP XAML inside Xbox Game Bar. -->
+    <PackageReference Include="Microsoft.Gaming.XboxGameBar"
+                      Version="7.3.2607010"
+                      GeneratePathProperty="true" />
+    <PackageReference Include="Microsoft.Windows.CsWinRT"
+                      Version="2.3.1"
+                      PrivateAssets="all" />
+    <CsWinRTInputs Include="$(PkgMicrosoft_Gaming_XboxGameBar)\lib\uap10.0\Microsoft.Gaming.XboxGameBar.winmd" />
+    <CsWinRTInputs Include="$(PkgMicrosoft_Gaming_XboxGameBar)\private\Microsoft.Gaming.XboxGameBar.Private.winmd" />
+
+    <!--
+      The current Game Bar package targets classic UAP, so its native contract
+      files are made explicit for this modern .NET UWP package.
+    -->
+    <Content Include="$(PkgMicrosoft_Gaming_XboxGameBar)\lib\uap10.0\Microsoft.Gaming.XboxGameBar.winmd">
+      <Link>Microsoft.Gaming.XboxGameBar.winmd</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="$(PkgMicrosoft_Gaming_XboxGameBar)\private\Microsoft.Gaming.XboxGameBar.Private.winmd">
+      <Link>Microsoft.Gaming.XboxGameBar.Private.winmd</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="$(PkgMicrosoft_Gaming_XboxGameBar)\runtimes\win10-$(Platform)\native\Microsoft.Gaming.XboxGameBar.dll">
+      <Link>Microsoft.Gaming.XboxGameBar.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="$(PkgMicrosoft_Gaming_XboxGameBar)\runtimes\win10-$(Platform)\native\Microsoft.Gaming.XboxGameBar.pri">
+      <Link>Microsoft.Gaming.XboxGameBar.pri</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+
+    <!--
+      The UWP XAML build requires these small contracts at compile time.
+      Source-linking preserves one source of truth while avoiding a UWP
+      project-reference issue that skips generated XAML partial classes.
+    -->
+    <Compile Include="..\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+    <!-- PawnIO's GPL text and exact corresponding source accompany its
+         unmodified signed installer in every sideload package. -->
+    <Content Include="..\Dependencies\PawnIO\COPYING">
+      <Link>ThirdParty\PawnIO\COPYING</Link>
+    </Content>
+    <Content Include="..\Dependencies\PawnIO\Source\PawnIO-2.2.0-source.zip">
+      <Link>ThirdParty\PawnIO\Source\PawnIO_Source.zip</Link>
+    </Content>
+    <Content Include="..\Dependencies\PawnIO\Source\PawnPP-e64e4c37-source.zip">
+      <Link>ThirdParty\PawnIO\Source\PawnPP_Source.zip</Link>
+    </Content>
+    <Content Include="..\PRIVACY">
+      <Link>Legal\PRIVACY</Link>
+    </Content>
+    <Content Include="..\LICENSE">
+      <Link>Legal\LICENSE</Link>
+    </Content>
+    <Content Include="..\THIRD-PARTY-NOTICES">
+      <Link>Legal\THIRD-PARTY-NOTICES</Link>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Build the collector, but do not reference its code from the sandboxed widget. -->
+    <ProjectReference Include="..\SensorHUD.Collector\SensorHUD.Collector.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <CollectorOutputDir>$(MSBuildProjectDirectory)\..\SensorHUD.Collector\bin\$(Platform)\$(Configuration)\net10.0-windows10.0.26100.0\win-$(Platform)\</CollectorOutputDir>
+  </PropertyGroup>
+
+  <!--
+    Include the collector and its app-local runtime in the same MSIX. Files are
+    added in a target (instead of an evaluated glob) so a clean first build
+    sees the collector output created by the ProjectReference.
+  -->
+  <Target Name="SignCollectorForPackage"
+          Condition="'$(CollectorSigningThumbprint)' != ''">
+    <PropertyGroup>
+      <CollectorExecutable>$(CollectorOutputDir)SensorHUD Data Collector.exe</CollectorExecutable>
+    </PropertyGroup>
+    <Error Condition="'$(CollectorSignToolPath)' == '' or !Exists('$(CollectorSignToolPath)')"
+           Text="CollectorSignToolPath must point to signtool.exe for a signed release." />
+    <Error Condition="!Exists('$(CollectorExecutable)')"
+           Text="The collector executable was not built before package signing." />
+    <!--
+      Sign the elevated executable separately from the MSIX. Once the release
+      certificate is trusted, Windows can identify yoqzii in the UAC prompt.
+    -->
+    <Exec Command="&quot;$(CollectorSignToolPath)&quot; sign /sha1 &quot;$(CollectorSigningThumbprint)&quot; /s My /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 &quot;$(CollectorExecutable)&quot;" />
+  </Target>
+
+  <Target Name="AddCollectorToPackage"
+          BeforeTargets="_ComputeAppxPackagePayload">
+    <CallTarget Targets="SignCollectorForPackage" />
+    <ItemGroup>
+      <CollectorPackageFile Include="$(CollectorOutputDir)**\*"
+                            Exclude="$(CollectorOutputDir)**\*.pdb;$(CollectorOutputDir)**\*.xml" />
+      <PackagingOutputs Include="@(CollectorPackageFile)">
+        <TargetPath>Collector\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
+        <OutputGroup>CustomOutputGroupForPackaging</OutputGroup>
+        <ProjectName>$(ProjectName)</ProjectName>
+      </PackagingOutputs>
+    </ItemGroup>
+  </Target>
+
+  <!-- Make local loose-file deployment contain the same collector payload. -->
+  <Target Name="CopyCollectorToOutput" AfterTargets="Build">
+    <ItemGroup>
+      <CollectorOutputFile Include="$(CollectorOutputDir)**\*"
+                           Exclude="$(CollectorOutputDir)**\*.pdb;$(CollectorOutputDir)**\*.xml" />
+    </ItemGroup>
+    <Copy SourceFiles="@(CollectorOutputFile)"
+          DestinationFiles="@(CollectorOutputFile->'$(OutDir)Collector\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+</Project>

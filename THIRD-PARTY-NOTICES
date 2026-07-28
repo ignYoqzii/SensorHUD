@@ -1,0 +1,34 @@
+Third-Party Notices
+
+This product includes third-party components. Their respective authors retain
+all rights granted by their licenses.
+
+PawnIO 2.2.0
+Copyright (C) namazso and contributors
+License: GNU General Public License version 2 or later, with the exception
+described by the PawnIO project
+Project: https://github.com/namazso/PawnIO
+
+The unmodified signed PawnIO installer, the GNU GPL text, and corresponding
+source archives are distributed under ThirdParty/PawnIO in the application
+package and under Dependencies/PawnIO in the source repository.
+
+LibreHardwareMonitorLib 0.9.6
+Copyright LibreHardwareMonitor contributors
+License: Mozilla Public License 2.0
+Project: https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
+
+Microsoft.Diagnostics.Tracing.TraceEvent 3.2.5
+Copyright Microsoft Corporation and contributors
+License: MIT
+Project: https://github.com/microsoft/perfview
+
+Microsoft.Gaming.XboxGameBar
+Copyright Microsoft Corporation
+Distributed under the license included with the Microsoft.Gaming.XboxGameBar
+NuGet package.
+
+Microsoft.Windows.CsWinRT
+Copyright Microsoft Corporation
+License: MIT
+Project: https://github.com/microsoft/CsWinRT

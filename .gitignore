@@ -1,0 +1,44 @@
+# IDE and user-specific state
+.vs/
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build, package, test, and profiling outputs
+**/[Bb]in/
+**/[Oo]bj/
+**/AppPackages/
+**/[Pp]ublish/
+artifacts/
+TestResults/
+BenchmarkDotNet.Artifacts/
+*.binlog
+
+# Signing keys, local certificates, and secrets
+*.pfx
+*.p12
+*.pvk
+*.snk
+*.key
+*.pem
+*.cer
+.env
+.env.*
+!.env.example
+secrets.json
+appsettings.*.local.json
+
+# Generated Windows packages
+*.appx
+*.appxbundle
+*.msix
+*.msixbundle
+*.msixupload
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini

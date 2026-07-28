@@ -1,0 +1,11 @@
+Security Policy
+
+Do not report security vulnerabilities in a public issue.
+
+Use the private security-advisory feature of the repository that hosts this
+project. Include the affected version, reproduction steps, expected impact,
+and any relevant logs after removing personal or sensitive information.
+
+Supported versions
+
+Security fixes are applied to the latest published version.
