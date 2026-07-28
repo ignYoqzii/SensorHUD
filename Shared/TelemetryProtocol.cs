@@ -14,6 +14,8 @@ public static class MetricIds
     public const string CpuUsage = "cpu.usage";
     public const string CpuTemperature = "cpu.temperature";
     public const string RamUsage = "ram.usage";
+    public const string RamUsed = "ram.used";
+    public const string RamTotal = "ram.total";
     public const string NetworkSend = "network.send";
     public const string NetworkReceive = "network.receive";
 
@@ -21,6 +23,8 @@ public static class MetricIds
     public const string UsageSuffix = ".usage";
     public const string TemperatureSuffix = ".temperature";
     public const string VramSuffix = ".vram";
+    public const string VramUsedSuffix = ".vramUsed";
+    public const string VramTotalSuffix = ".vramTotal";
 
     public static string ForGpu(string deviceId, string suffix) =>
         $"{GpuPrefix}{deviceId}{suffix}";
@@ -41,6 +45,7 @@ public static class MetricUnits
     public const string Milliseconds = "ms";
     public const string Percent = "%";
     public const string Celsius = "°C";
+    public const string Gigabytes = "GB";
     public const string MegabitsPerSecond = "Mbps";
 }
 

@@ -1,11 +1,13 @@
 using System.Collections.Concurrent;
-using System.Security.Cryptography;
-using System.Text;
 using LibreHardwareMonitor.Hardware;
 using SensorHUD.Shared;
 
 namespace SensorHUD.Collector.Sampling.Providers;
 
+/// <summary>
+/// Reads CPU, GPU, memory, and network sensors through
+/// LibreHardwareMonitor and a small Windows memory query.
+/// </summary>
 internal sealed partial class HardwareSensorProvider : ITelemetryProvider, IDisposable
 {
     private static readonly UpdateVisitor Visitor = new();
@@ -15,7 +17,7 @@ internal sealed partial class HardwareSensorProvider : ITelemetryProvider, IDisp
     private readonly string? _startupError;
     private readonly string? _hardwareAccessError;
 
-    // Reusable buffer to prevent allocating lists/arrays on every hardware scan
+    // Reuse one sensor buffer because hardware groups are sampled sequentially.
     private readonly List<ISensor> _sensorBuffer = new(128);
 
     public HardwareSensorProvider(string? hardwareAccessError = null)
@@ -26,7 +28,7 @@ internal sealed partial class HardwareSensorProvider : ITelemetryProvider, IDisp
             IsCpuEnabled = true,
             IsGpuEnabled = true,
             IsMemoryEnabled = true,
-            IsNetworkEnabled = true
+            IsNetworkEnabled = true,
         };
 
         try
@@ -59,13 +61,27 @@ internal sealed partial class HardwareSensorProvider : ITelemetryProvider, IDisp
 
             foreach (IHardware hardware in _computer.Hardware)
             {
-                if (hardware.HardwareType == HardwareType.Cpu) cpu = hardware;
-                else if (hardware.HardwareType is HardwareType.GpuAmd or HardwareType.GpuIntel or HardwareType.GpuNvidia) gpus.Add(hardware);
-                else if (hardware.HardwareType == HardwareType.Network) networks.Add(hardware);
+                if (hardware.HardwareType == HardwareType.Cpu)
+                {
+                    cpu = hardware;
+                }
+                else if (hardware.HardwareType is
+                    HardwareType.GpuAmd or
+                    HardwareType.GpuIntel or
+                    HardwareType.GpuNvidia)
+                {
+                    gpus.Add(hardware);
+                }
+                else if (hardware.HardwareType == HardwareType.Network)
+                {
+                    networks.Add(hardware);
+                }
             }
 
             AddCpu(values, cpu);
-            AddMemory(values); // Memory from LibreHardwareMonitorLib is unreliable, so we use Windows memory interop instead
+            // Windows reports physical memory totals more consistently than
+            // the optional LibreHardwareMonitor memory device.
+            AddMemory(values);
             AddNetwork(values, networks);
 
             if (gpus.Count == 0)
@@ -91,27 +107,72 @@ internal sealed partial class HardwareSensorProvider : ITelemetryProvider, IDisp
 
     private void AddStartupErrors(List<TelemetryValue> values, string error)
     {
-        values.Add(UnavailableValue(MetricIds.CpuUsage, "CPU usage", MetricCategories.Cpu, MetricUnits.Percent, error, "CPU"));
-        values.Add(UnavailableValue(MetricIds.CpuTemperature, "CPU temperature", MetricCategories.Cpu, MetricUnits.Celsius, error, "CPU"));
-        values.Add(UnavailableValue(MetricIds.RamUsage, "RAM usage", MetricCategories.Ram, MetricUnits.Percent, error, "Memory"));
+        values.Add(UnavailableValue(
+            MetricIds.CpuUsage,
+            "CPU usage",
+            MetricCategories.Cpu,
+            MetricUnits.Percent,
+            error,
+            "CPU"));
+        values.Add(UnavailableValue(
+            MetricIds.CpuTemperature,
+            "CPU temperature",
+            MetricCategories.Cpu,
+            MetricUnits.Celsius,
+            error,
+            "CPU"));
+        values.Add(UnavailableValue(
+            MetricIds.RamUsage,
+            "RAM usage",
+            MetricCategories.Ram,
+            MetricUnits.Percent,
+            error,
+            "Memory"));
+        values.Add(UnavailableValue(
+            MetricIds.RamUsed,
+            "RAM used",
+            MetricCategories.Ram,
+            MetricUnits.Gigabytes,
+            error,
+            "Memory"));
+        values.Add(UnavailableValue(
+            MetricIds.RamTotal,
+            "RAM total",
+            MetricCategories.Ram,
+            MetricUnits.Gigabytes,
+            error,
+            "Memory"));
         AddUnavailableGpu(values, error);
         AddUnavailableNetwork(values, error);
     }
 
     public void Dispose()
     {
-        try { _computer.Close(); } catch { /* Ignore on shutdown */ }
+        try
+        {
+            _computer.Close();
+        }
+        catch
+        {
+            // Provider shutdown must never delay collector process exit.
+        }
     }
 
     private sealed class UpdateVisitor : IVisitor
     {
         public void VisitComputer(IComputer computer) => computer.Traverse(this);
+
         public void VisitHardware(IHardware hardware)
         {
             hardware.Update();
-            foreach (IHardware child in hardware.SubHardware) child.Accept(this);
+            foreach (IHardware child in hardware.SubHardware)
+            {
+                child.Accept(this);
+            }
         }
+
         public void VisitSensor(ISensor sensor) { }
+
         public void VisitParameter(IParameter parameter) { }
     }
 }

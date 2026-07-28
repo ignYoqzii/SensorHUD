@@ -12,6 +12,7 @@ internal sealed record MetricDefinition(
     string DefaultFormat,
     int DecimalPlaces,
     int Order,
+    bool EnabledByDefault = true,
     string DeviceName = "");
 
 /// <summary>

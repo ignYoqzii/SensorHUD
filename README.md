@@ -41,7 +41,7 @@ designed to be compact, responsive, and useful at a glance.
 
 | Live telemetry | Flexible presentation | Local by design |
 | --- | --- | --- |
-| CPU, GPU, memory, network, frame rate, temperatures, clocks, power, load, and fans | Configurable metrics, layout, update rate, colors, typography, and pinning | No account, advertising, analytics, cloud service, or network telemetry |
+| CPU, GPU, memory, network, frame rate, temperatures, load, and dedicated memory | Configurable metrics, templates, decimal precision, layout, colors, typography, and pinning | No account, advertising, analytics, cloud service, or remote telemetry |
 
 > [!NOTE]
 > Available readings depend on the sensors exposed by the computer's hardware,
@@ -85,7 +85,7 @@ older than the required version.
 ## Updating
 
 Download and extract the new release, then run its `Install.cmd`. Windows
-replaces the installed package while preserving compatible application
+replaces the installed package while preserving the application's local
 settings.
 
 ## Uninstallation
@@ -101,14 +101,23 @@ separately from **Windows Settings > Apps > Installed apps**.
 
 | Category | Available metrics |
 | --- | --- |
-| Processor | Load, temperature, clock speed, power, and fan speed when exposed |
-| Graphics | Load, temperature, clock speed, power, fan speed, and dedicated memory |
-| Memory | Physical memory and graphics memory usage |
+| Processor | Total load and package temperature |
+| Graphics | Load, temperature, dedicated-memory usage, memory used, and memory total for every detected GPU |
+| Memory | Physical-memory usage, memory used, and memory total |
 | Network | Upload and download throughput |
-| Games | Frame rate when a compatible ETW source is available |
+| Games | FPS, 1% Low, and average frametime when a compatible ETW source is available |
 
-Every category and individual metric can be enabled or hidden from the
-widget's settings page.
+Every individual metric can be enabled or hidden. Templates support
+`{value}`, `{unit}`, `{name}`, and `{device}`, and each metric can use its
+catalog default or zero, one, or two decimal places. The rendered value is
+slightly larger while the unit remains compact. The font-weight setting
+applies to labels and device names; `{value}` and `{unit}` remain normal
+weight for readability. Horizontal layout uses `|` as its default separator,
+and the separator can be changed in settings.
+
+The settings widget also reports collector health, PawnIO availability, frame
+capture state, detected hardware, the most recent snapshot time, and the
+latest connection error when troubleshooting is needed.
 
 ## How it works
 

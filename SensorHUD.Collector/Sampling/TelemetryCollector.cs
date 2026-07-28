@@ -7,22 +7,38 @@ namespace SensorHUD.Collector.Sampling;
 /// Coordinates independent telemetry providers and combines their readings.
 /// This sampling layer has no knowledge of process activation, IPC, or UI.
 /// </summary>
-/// <param name="hardwareAccessError">
-/// Optional explanation used when the host could not prepare privileged
-/// hardware access, such as PawnIO. Public metrics continue to work.
-/// </param>
-internal sealed class TelemetryCollector(string? hardwareAccessError = null) : IDisposable
+internal sealed class TelemetryCollector : IDisposable
 {
-    private readonly ITelemetryProvider[] _providers =
-        [
-            new HardwareSensorProvider(hardwareAccessError),
-            new FrameMetricsProvider(),
-        ];
+    private const string UnknownDeviceName = "Not detected";
+
+    private readonly FrameMetricsProvider _frameProvider;
+    private readonly ITelemetryProvider[] _providers;
+    private readonly string _pawnIoStatus;
+
+    /// <summary>
+    /// Creates the provider set used for every sampling pass.
+    /// </summary>
+    /// <param name="pawnIoStatus">
+    /// Short dependency status displayed by the settings widget.
+    /// </param>
+    /// <param name="hardwareAccessError">
+    /// Optional error appended to protected readings when PawnIO is not ready.
+    /// </param>
+    public TelemetryCollector(
+        string pawnIoStatus,
+        string? hardwareAccessError = null)
+    {
+        _pawnIoStatus = pawnIoStatus;
+        HardwareSensorProvider hardwareProvider =
+            new(hardwareAccessError);
+        _frameProvider = new FrameMetricsProvider();
+        _providers = [hardwareProvider, _frameProvider];
+    }
 
     /// <summary>
     /// Captures one point-in-time set of all available readings.
     /// </summary>
-    public List<TelemetryValue> Sample()
+    public TelemetrySample Sample()
     {
         List<TelemetryValue> readings = [];
 
@@ -40,7 +56,39 @@ internal sealed class TelemetryCollector(string? hardwareAccessError = null) : I
             }
         }
 
-        return readings;
+        string cpuName = UnknownDeviceName;
+        HashSet<string> gpuNames =
+            new(StringComparer.CurrentCultureIgnoreCase);
+        foreach (TelemetryValue reading in readings)
+        {
+            if (cpuName == UnknownDeviceName &&
+                reading.Category == MetricCategories.Cpu &&
+                !string.IsNullOrWhiteSpace(reading.DeviceName))
+            {
+                cpuName = reading.DeviceName;
+            }
+            else if (reading.Category == MetricCategories.Gpu &&
+                !string.IsNullOrWhiteSpace(reading.DeviceName) &&
+                !string.Equals(
+                    reading.DeviceName,
+                    "GPU",
+                    StringComparison.Ordinal))
+            {
+                gpuNames.Add(reading.DeviceName);
+            }
+        }
+
+        return new TelemetrySample(
+            readings,
+            new CollectorDiagnostics
+            {
+                IsAdministrator = true,
+                PawnIoStatus = _pawnIoStatus,
+                FrameMetricsStatus = _frameProvider.Status,
+                CpuName = cpuName,
+                GpuNames =
+                    [.. gpuNames.Order(StringComparer.CurrentCultureIgnoreCase)],
+            });
     }
 
     public void Dispose()
@@ -54,3 +102,10 @@ internal sealed class TelemetryCollector(string? hardwareAccessError = null) : I
         }
     }
 }
+
+/// <summary>
+/// One provider pass before the host attaches session and transport metadata.
+/// </summary>
+internal sealed record TelemetrySample(
+    List<TelemetryValue> Values,
+    CollectorDiagnostics Diagnostics);

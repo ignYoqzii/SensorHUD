@@ -9,8 +9,9 @@ namespace SensorHUD.Collector.Sampling.Providers;
 
 internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
 {
+    private const int DxgKernelPresentEventId = 0x00B8;
+
     private static readonly Guid DxgKernelProvider = new("802EC45A-1E99-4B83-9920-87C98277BA9D");
-    private static readonly int DxgKernelPresentEventId = 0x00B8;
     private static readonly TimeSpan CalculationWindow = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan RetentionWindow = TimeSpan.FromSeconds(6);
 
@@ -25,17 +26,33 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
 
     private readonly Lock _sync = new();
 
-    // Using a queue or ring buffer structure to minimize resizing overhead
+    // A queue makes expired presentation timestamps inexpensive to remove.
     private readonly Dictionary<int, Queue<double>> _presentsByProcess = [];
     private readonly Dictionary<int, string> _processNameCache = [];
 
     private TraceEventSession? _session;
     private string? _traceError = "Starting frame trace…";
+    private string _status = "Starting frame trace…";
     private volatile bool _disposed;
 
     public FrameMetricsProvider()
     {
         _ = Task.Run(ProcessEvents);
+    }
+
+    /// <summary>
+    /// Concise health text copied into collector diagnostics. Access is locked
+    /// because ETW callbacks and the sampling loop run on different threads.
+    /// </summary>
+    public string Status
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _status;
+            }
+        }
     }
 
     public IReadOnlyList<TelemetryValue> Sample()
@@ -46,7 +63,7 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
             double retentionCutoff = now - RetentionWindow.TotalSeconds;
             double calcCutoff = now - CalculationWindow.TotalSeconds;
 
-            // Cleanup old entries efficiently
+            // Drop old presentation timestamps and process-name cache entries.
             foreach (var kvp in _presentsByProcess.ToArray())
             {
                 var queue = kvp.Value;
@@ -63,26 +80,29 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
 
             if (_traceError is not null)
             {
+                _status = _traceError;
                 return Unavailable(_traceError);
             }
 
             int? targetProcess = ChooseTargetProcess(calcCutoff);
             if (targetProcess is null)
             {
+                _status = "Waiting for a presenting game";
                 return Unavailable("No presenting game has been detected yet.");
             }
 
+            string? processName =
+                _processNameCache.GetValueOrDefault(targetProcess.Value);
+            string targetName = string.IsNullOrWhiteSpace(processName)
+                ? $"PID {targetProcess.Value}"
+                : processName;
             var targetQueue = _presentsByProcess[targetProcess.Value];
 
-            // Extract times within the calculation window without heavy LINQ
-            int count = 0;
-            foreach (var time in targetQueue)
-            {
-                if (time >= calcCutoff) count++;
-            }
+            int count = CountRecentPresents(targetQueue, calcCutoff);
 
             if (count < 2)
             {
+                _status = $"Warming up · {targetName}";
                 return Unavailable("Waiting for enough frame samples.");
             }
 
@@ -96,7 +116,7 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
                 }
             }
 
-            // Calculate frame intervals
+            // Convert consecutive presentation timestamps into milliseconds.
             int intervalCount = count - 1;
             Span<double> frameTimes = stackalloc double[intervalCount];
             int validIntervals = 0;
@@ -112,6 +132,7 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
 
             if (validIntervals == 0)
             {
+                _status = $"Warming up · {targetName}";
                 return Unavailable("Waiting for valid frame intervals.");
             }
 
@@ -121,10 +142,14 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
             double fps = duration > 0 ? intervalCount / duration : 0;
 
             double sum = 0;
-            for (int i = 0; i < validIntervals; i++) sum += activeFrameTimes[i];
+            for (int i = 0; i < validIntervals; i++)
+            {
+                sum += activeFrameTimes[i];
+            }
+
             double frameTime = sum / validIntervals;
 
-            // Compute 1% low efficiently using array sorting or pooling
+            // Compute 1% Low efficiently using a pooled sorting buffer.
             double[] sortedIntervals = ArrayPool<double>.Shared.Rent(validIntervals);
             try
             {
@@ -133,7 +158,7 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
 
                 int slowFrameCount = Math.Max(1, (int)Math.Ceiling(validIntervals * 0.01));
                 double slowSum = 0;
-                // Elements are sorted ascending, so slowest frames are at the end
+                // Values are ascending, so the slowest frames are at the end.
                 for (int i = 0; i < slowFrameCount; i++)
                 {
                     slowSum += sortedIntervals[validIntervals - 1 - i];
@@ -141,11 +166,12 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
 
                 double slowAverage = slowSum / slowFrameCount;
                 double onePercentLow = slowAverage > 0 ? 1000.0 / slowAverage : 0;
+                _status = $"Active · {targetName}";
 
                 return
                 [
                     Value(MetricIds.Fps, "FPS", MetricUnits.FramesPerSecond, fps),
-                    Value(MetricIds.OnePercentLow, "1% low", MetricUnits.FramesPerSecond, onePercentLow),
+                    Value(MetricIds.OnePercentLow, "1% Low", MetricUnits.FramesPerSecond, onePercentLow),
                     Value(MetricIds.Frametime, "Frametime", MetricUnits.Milliseconds, frameTime),
                 ];
             }
@@ -176,6 +202,7 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
             lock (_sync)
             {
                 _traceError = null;
+                _status = "Waiting for a presenting game";
             }
 
             session.Source.Process();
@@ -192,7 +219,10 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
 
     private void OnTraceEvent(TraceEvent data)
     {
-        if (_disposed || data.ProcessID <= 0) return;
+        if (_disposed || data.ProcessID <= 0)
+        {
+            return;
+        }
 
         if (data.ProviderGuid != DxgKernelProvider || (int)data.ID != DxgKernelPresentEventId)
         {
@@ -221,12 +251,10 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
         {
             if (_presentsByProcess.TryGetValue(foreground, out Queue<double>? fgQueue))
             {
-                int count = 0;
-                foreach (var t in fgQueue)
+                if (CountRecentPresents(fgQueue, cutoff) >= 3)
                 {
-                    if (t >= cutoff) count++;
+                    return foreground;
                 }
-                if (count >= 3) return foreground;
             }
         }
 
@@ -235,14 +263,12 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
 
         foreach (var pair in _presentsByProcess)
         {
-            if (IsExcluded(pair.Key)) continue;
-
-            int count = 0;
-            foreach (var t in pair.Value)
+            if (IsExcluded(pair.Key))
             {
-                if (t >= cutoff) count++;
+                continue;
             }
 
+            int count = CountRecentPresents(pair.Value, cutoff);
             if (count > maxCount)
             {
                 maxCount = count;
@@ -255,7 +281,10 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
 
     private bool IsExcluded(int processId)
     {
-        if (processId == Environment.ProcessId) return true;
+        if (processId == Environment.ProcessId)
+        {
+            return true;
+        }
 
         lock (_sync)
         {
@@ -287,12 +316,31 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
         }
     }
 
+    private static int CountRecentPresents(
+        Queue<double> timestamps,
+        double cutoff)
+    {
+        int count = 0;
+        foreach (double timestamp in timestamps)
+        {
+            if (timestamp >= cutoff)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
     private static int GetForegroundProcessId()
     {
         nint window = GetForegroundWindow();
-        if (window == 0) return 0;
+        if (window == 0)
+        {
+            return 0;
+        }
 
-        GetWindowThreadProcessId(window, out uint processId);
+        _ = GetWindowThreadProcessId(window, out uint processId);
         return unchecked((int)processId);
     }
 
@@ -301,6 +349,7 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
         lock (_sync)
         {
             _traceError = message;
+            _status = message;
         }
     }
 
@@ -314,7 +363,7 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
         return
         [
             Value(MetricIds.Fps, "FPS", MetricUnits.FramesPerSecond, null, error),
-            Value(MetricIds.OnePercentLow, "1% low", MetricUnits.FramesPerSecond, null, error),
+            Value(MetricIds.OnePercentLow, "1% Low", MetricUnits.FramesPerSecond, null, error),
             Value(MetricIds.Frametime, "Frametime", MetricUnits.Milliseconds, null, error),
         ];
     }
@@ -344,5 +393,7 @@ internal sealed class FrameMetricsProvider : ITelemetryProvider, IDisposable
 
     [DllImport("user32.dll")]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
-    private static extern uint GetWindowThreadProcessId(nint window, out uint processId);
+    private static extern uint GetWindowThreadProcessId(
+        nint window,
+        out uint processId);
 }

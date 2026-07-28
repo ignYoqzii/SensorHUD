@@ -117,14 +117,17 @@ internal sealed class CollectorClient
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
-        catch
+        catch (Exception exception)
         {
             // The Game Bar process is the user-facing safety boundary. An
             // unforeseen IPC failure becomes no data instead of crashing the
             // widget; reopening it creates a completely fresh client session.
             if (!cancellationToken.IsCancellationRequested)
             {
-                PublishStatus(sessionId, CollectorStates.NoData);
+                PublishStatus(
+                    sessionId,
+                    CollectorStates.NoData,
+                    exception.Message);
             }
         }
     }
@@ -180,7 +183,10 @@ internal sealed class CollectorClient
                 {
                     // Never leave a stale Running snapshot visible while the
                     // client is reconnecting to a failed service.
-                    PublishStatus(sessionId, CollectorStates.Starting);
+                    PublishStatus(
+                        sessionId,
+                        CollectorStates.Starting,
+                        exception.Message);
                 }
 
                 if (!cancellationToken.IsCancellationRequested &&
@@ -195,7 +201,10 @@ internal sealed class CollectorClient
                     failedAttempts >= AttemptsBeforeNoData)
                 {
                     noDataPublished = true;
-                    PublishStatus(sessionId, CollectorStates.NoData);
+                    PublishStatus(
+                        sessionId,
+                        CollectorStates.NoData,
+                        exception.Message);
                 }
             }
             finally
@@ -329,12 +338,20 @@ internal sealed class CollectorClient
         }
     }
 
-    private void PublishStatus(string sessionId, string status)
+    private void PublishStatus(
+        string sessionId,
+        string status,
+        string? error = null)
     {
         TelemetrySnapshot snapshot = new()
         {
             SessionId = sessionId,
             CollectorStatus = status,
+            CapturedAtUtc = DateTimeOffset.UtcNow,
+            Diagnostics = new CollectorDiagnostics
+            {
+                LastError = error,
+            },
         };
         Volatile.Write(ref _latestSnapshot, snapshot);
         NotifySnapshotReceived(snapshot);

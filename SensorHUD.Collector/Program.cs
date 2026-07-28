@@ -58,10 +58,11 @@ internal static class Program
             // This check runs on every collector start, but the bundled
             // installer runs only when PawnIO is missing, damaged, or older
             // than the required version.
-            string? pawnIoError =
+            PawnIoInstaller.PawnIoResult pawnIo =
                 await PawnIoInstaller.EnsureInstalledAsync();
 
-            using TelemetryCollector collector = new(pawnIoError);
+            using TelemetryCollector collector =
+                new(pawnIo.Status, pawnIo.Error);
             TelemetryPipeServer pipeServer = new(packageFamilyName);
             CollectorService service = new(collector, pipeServer);
             await service.RunAsync();

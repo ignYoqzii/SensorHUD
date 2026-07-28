@@ -5,30 +5,31 @@ using System.Threading.Tasks;
 using SensorHUD.Models;
 using SensorHUD.Services;
 using SensorHUD.Shared;
+using SensorHUD.ViewModels;
+using Windows.ApplicationModel;
+using Windows.UI;
 using Windows.UI.Core;
-using Windows.UI.Text;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Media;
 
 namespace SensorHUD;
 
 /// <summary>
-/// Game Bar settings widget. Changes are previewed in memory immediately and
-/// persisted after a short debounce to avoid writing once per slider pixel.
+/// Game Bar settings widget. Editable state is data-bound to a small view
+/// model, previewed immediately, and persisted after a short debounce.
 /// </summary>
 public sealed partial class SettingsPage : Page
 {
-    private const double PercentageScale = 100;
-
-    private readonly Dictionary<string, MetricEditor> _editors = [];
+    private readonly CollectorClient _collectorClient =
+        CollectorClient.Shared;
     private readonly DispatcherTimer _saveTimer = new()
     {
         Interval = CollectorProtocol.SettingsSaveDelay,
     };
 
-    private TelemetrySettings _settings = SettingsService.CreateDefaults();
     private IReadOnlyList<MetricDefinition> _definitions = [];
-    private bool _loading = true;
+    private string _definitionSignature = string.Empty;
     private bool _saving;
     private bool _saveRequested;
 
@@ -36,141 +37,78 @@ public sealed partial class SettingsPage : Page
     {
         InitializeComponent();
         _saveTimer.Tick += SaveTimer_Tick;
+        _collectorClient.SnapshotReceived +=
+            CollectorClient_SnapshotReceived;
         Loaded += SettingsPage_Loaded;
         Unloaded += SettingsPage_Unloaded;
     }
 
-    private async void SettingsPage_Loaded(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// Strongly typed source for the page-level compiled bindings.
+    /// </summary>
+    public SettingsPageViewModel? ViewModel { get; private set; }
+
+    private async void SettingsPage_Loaded(
+        object sender,
+        RoutedEventArgs e)
     {
         Loaded -= SettingsPage_Loaded;
 
         TelemetrySettings settings = await SettingsService.LoadAsync();
-        TelemetrySnapshot? snapshot = CollectorClient.Shared.LatestSnapshot;
+        TelemetrySnapshot? snapshot = _collectorClient.LatestSnapshot;
         IReadOnlyList<MetricDefinition> definitions =
             MetricCatalog.CreateForSnapshot(snapshot);
 
         await RunOnUiThreadAsync(() =>
         {
-            _settings = settings;
-            _definitions = definitions;
-            PopulateControls();
-            _loading = false;
+            SetViewModel(settings, definitions);
+            UpdateDiagnostics(snapshot);
+            UpdateVersion();
         });
     }
 
-    private void PopulateControls()
+    /// <summary>
+    /// Replaces the complete editable state without manually touching any
+    /// controls. Initial compiled-binding reads do not trigger a save because
+    /// the change event is attached only after the bindings are refreshed.
+    /// </summary>
+    private void SetViewModel(
+        TelemetrySettings settings,
+        IReadOnlyList<MetricDefinition> definitions)
     {
-        SelectComboItem(LayoutBox, _settings.Layout);
-        HorizontalSeparatorBox.Text = _settings.HorizontalSeparator;
-        SelectComboItem(FontWeightBox, _settings.FontWeight);
-        OpacitySlider.Value = _settings.BackgroundOpacity * PercentageScale;
-        FontSizeSlider.Value = _settings.FontSize;
-        FontFamilyBox.Text = _settings.FontFamily;
-        FontColorBox.Text = _settings.FontColor;
-
-        MetricSections.Children.Clear();
-        _editors.Clear();
-
-        foreach (IGrouping<string, MetricDefinition> group in _definitions
-            .GroupBy(definition => definition.Section.Id))
+        if (ViewModel is not null)
         {
-            MetricSection section = group.First().Section;
-            StackPanel content = new() { Spacing = 9 };
-            content.Children.Add(new TextBlock
-            {
-                Text = section.Name,
-                FontSize = 19,
-                FontWeight = FontWeights.SemiBold,
-            });
-
-            foreach (MetricDefinition definition in group)
-            {
-                AddMetricEditor(content, definition);
-            }
-
-            MetricSections.Children.Add(new Border
-            {
-                Style = (Style)Resources["SectionCardStyle"],
-                Child = content,
-            });
+            ViewModel.SettingsChanged -=
+                ViewModel_SettingsChanged;
         }
+
+        _definitions = definitions;
+        _definitionSignature = CreateDefinitionSignature(definitions);
+
+        SettingsPageViewModel viewModel =
+            new(settings, definitions);
+        ViewModel = viewModel;
+        Bindings.Update();
+        viewModel.SettingsChanged += ViewModel_SettingsChanged;
     }
 
-    private void AddMetricEditor(StackPanel section, MetricDefinition definition)
+    private void ViewModel_SettingsChanged(
+        object? sender,
+        EventArgs e)
     {
-        MetricPreference? preference = _settings.Metrics
-            .FirstOrDefault(item => item.Id == definition.Id);
-
-        ToggleSwitch toggle = new()
-        {
-            Header = definition.Name,
-            IsOn = preference?.IsEnabled ?? true,
-            OnContent = "On",
-            OffContent = "Off",
-        };
-        toggle.Toggled += MetricSetting_Changed;
-
-        TextBox format = new()
-        {
-            Header = "Format",
-            Text = string.IsNullOrWhiteSpace(preference?.Format)
-                ? definition.DefaultFormat
-                : preference.Format,
-            Description = $"Unit: {definition.Unit}",
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-        };
-        format.TextChanged += MetricSetting_Changed;
-
-        StackPanel row = new() { Spacing = 4 };
-        row.Children.Add(toggle);
-        row.Children.Add(format);
-        section.Children.Add(row);
-        _editors[definition.Id] = new MetricEditor(toggle, format);
-    }
-
-    private TelemetrySettings ReadSettingsFromControls()
-    {
-        HashSet<string> visibleIds = _definitions
-            .Select(definition => definition.Id)
-            .ToHashSet(StringComparer.Ordinal);
-
-        // Keep preferences for temporarily absent GPUs. Otherwise opening
-        // settings while the collector is unavailable would silently erase
-        // those user choices on the next save.
-        List<MetricPreference> preferences = [.. _settings.Metrics.Where(preference => !visibleIds.Contains(preference.Id))];
-        preferences.AddRange(_definitions.Select(definition =>
-        {
-            MetricEditor editor = _editors[definition.Id];
-            return new MetricPreference
-            {
-                Id = definition.Id,
-                IsEnabled = editor.Toggle.IsOn,
-                Format = editor.Format.Text,
-            };
-        }));
-
-        return new TelemetrySettings
-        {
-            Layout = SelectedText(LayoutBox, TelemetryDefaults.Layout),
-            HorizontalSeparator = HorizontalSeparatorBox.Text,
-            BackgroundOpacity = OpacitySlider.Value / PercentageScale,
-            FontFamily = FontFamilyBox.Text,
-            FontWeight = SelectedText(FontWeightBox, TelemetryDefaults.FontWeight),
-            FontSize = FontSizeSlider.Value,
-            FontColor = FontColorBox.Text,
-            Metrics = preferences,
-        };
+        QueueAutoSave();
     }
 
     private void QueueAutoSave()
     {
-        if (_loading)
+        if (ViewModel is null)
         {
             return;
         }
 
-        TelemetrySettings preview = ReadSettingsFromControls();
-        SettingsService.Preview(preview);
+        // Preview is intentionally synchronous so the pinned widget changes
+        // in the same UI interaction. Disk writes remain debounced.
+        SettingsService.Preview(ViewModel.ToSettings());
 
         _saveRequested = true;
         if (!_saving)
@@ -183,19 +121,18 @@ public sealed partial class SettingsPage : Page
     private async void SaveTimer_Tick(object? sender, object e)
     {
         _saveTimer.Stop();
-        if (_saving || !_saveRequested)
+        if (_saving || !_saveRequested || ViewModel is null)
         {
             return;
         }
 
         _saving = true;
         _saveRequested = false;
-        TelemetrySettings settings = ReadSettingsFromControls();
+        TelemetrySettings settings = ViewModel.ToSettings();
 
         try
         {
             await SettingsService.SaveAsync(settings);
-            _settings = settings;
         }
         catch
         {
@@ -213,50 +150,36 @@ public sealed partial class SettingsPage : Page
         });
     }
 
-    private void Setting_Changed(object sender, SelectionChangedEventArgs e) => QueueAutoSave();
-
-    private void Setting_TextChanged(object sender, TextChangedEventArgs e) => QueueAutoSave();
-
-    private void MetricSetting_Changed(object sender, RoutedEventArgs e) => QueueAutoSave();
-
-    private void OpacitySlider_ValueChanged(
-        object sender,
-        Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-    {
-        OpacityValue?.Text = $"{e.NewValue:F0}%";
-
-        QueueAutoSave();
-    }
-
-    private void FontSizeSlider_ValueChanged(
-        object sender,
-        Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-    {
-        FontSizeValue?.Text = $"{e.NewValue:F0}";
-
-        QueueAutoSave();
-    }
-
     private void ResetButton_Click(object sender, RoutedEventArgs e)
     {
-        _loading = true;
-        _settings = SettingsService.CreateDefaults();
-        PopulateControls();
-        _loading = false;
+        SetViewModel(
+            SettingsService.CreateDefaults(),
+            _definitions);
         QueueAutoSave();
     }
 
-    private async void SettingsPage_Unloaded(object sender, RoutedEventArgs e)
+    private async void SettingsPage_Unloaded(
+        object sender,
+        RoutedEventArgs e)
     {
         _saveTimer.Stop();
         _saveTimer.Tick -= SaveTimer_Tick;
+        _collectorClient.SnapshotReceived -=
+            CollectorClient_SnapshotReceived;
         Unloaded -= SettingsPage_Unloaded;
 
-        if (_saveRequested)
+        if (ViewModel is not null)
+        {
+            ViewModel.SettingsChanged -=
+                ViewModel_SettingsChanged;
+        }
+
+        if (_saveRequested && ViewModel is not null)
         {
             try
             {
-                await SettingsService.SaveAsync(ReadSettingsFromControls());
+                await SettingsService.SaveAsync(
+                    ViewModel.ToSettings());
             }
             catch
             {
@@ -265,20 +188,114 @@ public sealed partial class SettingsPage : Page
         }
     }
 
-    private static void SelectComboItem(ComboBox box, string value)
+    private async void CollectorClient_SnapshotReceived(
+        TelemetrySnapshot snapshot)
     {
-        box.SelectedItem = box.Items
-            .OfType<ComboBoxItem>()
-            .FirstOrDefault(item => string.Equals(
-                item.Content?.ToString(),
-                value,
-                StringComparison.Ordinal))
-            ?? box.Items.FirstOrDefault();
+        try
+        {
+            await RunOnUiThreadAsync(() =>
+            {
+                UpdateDiagnostics(snapshot);
+                RefreshMetricCatalog(snapshot);
+            });
+        }
+        catch
+        {
+            // The settings widget may be closing while a final snapshot is
+            // being dispatched from the shared pipe client.
+        }
     }
 
-    private static string SelectedText(ComboBox box, string fallback)
+    /// <summary>
+    /// Rebinds metric cards only when the collector exposes a different set
+    /// of IDs, such as when a GPU first appears. Normal one-second snapshots
+    /// therefore cause no settings-tree allocation or visual disturbance.
+    /// </summary>
+    private void RefreshMetricCatalog(TelemetrySnapshot snapshot)
     {
-        return (box.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? fallback;
+        if (ViewModel is null)
+        {
+            return;
+        }
+
+        IReadOnlyList<MetricDefinition> definitions =
+            MetricCatalog.CreateForSnapshot(snapshot);
+        string signature = CreateDefinitionSignature(definitions);
+        if (signature == _definitionSignature)
+        {
+            return;
+        }
+
+        SetViewModel(ViewModel.ToSettings(), definitions);
+    }
+
+    private static string CreateDefinitionSignature(
+        IReadOnlyList<MetricDefinition> definitions)
+    {
+        return string.Join(
+            "|",
+            definitions.Select(definition => definition.Id));
+    }
+
+    private void UpdateDiagnostics(TelemetrySnapshot? snapshot)
+    {
+        bool running = string.Equals(
+            snapshot?.CollectorStatus,
+            CollectorStates.Running,
+            StringComparison.Ordinal);
+        CollectorDiagnostics diagnostics =
+            snapshot?.Diagnostics ?? new CollectorDiagnostics();
+
+        CollectorStatusText.Text =
+            snapshot?.CollectorStatus ?? CollectorStates.NoData;
+        Color indicatorColor = running
+            ? Color.FromArgb(255, 57, 196, 115)
+            : string.Equals(
+                snapshot?.CollectorStatus,
+                CollectorStates.Starting,
+                StringComparison.Ordinal)
+                ? Color.FromArgb(255, 245, 165, 36)
+                : Color.FromArgb(255, 229, 72, 77);
+        CollectorStatusIndicator.Fill = new SolidColorBrush(
+            indicatorColor);
+        LastSnapshotText.Text = running && snapshot is not null
+            ? snapshot.CapturedAtUtc.ToLocalTime().ToString("T")
+            : "Waiting";
+        AdministratorStatusText.Text = running
+            ? diagnostics.IsAdministrator ? "Elevated" : "Not elevated"
+            : "Unknown";
+        PawnIoStatusText.Text = running
+            ? diagnostics.PawnIoStatus
+            : "Unknown";
+        FrameMetricsStatusText.Text = running
+            ? diagnostics.FrameMetricsStatus
+            : "Waiting";
+        CpuStatusText.Text = running
+            ? diagnostics.CpuName
+            : "Not detected";
+        GpuStatusText.Text = running && diagnostics.GpuNames.Count > 0
+            ? string.Join(Environment.NewLine, diagnostics.GpuNames)
+            : "Not detected";
+
+        bool hasError =
+            !string.IsNullOrWhiteSpace(diagnostics.LastError);
+        LastErrorPanel.Visibility =
+            hasError ? Visibility.Visible : Visibility.Collapsed;
+        LastErrorText.Text = diagnostics.LastError ?? string.Empty;
+    }
+
+    private void UpdateVersion()
+    {
+        try
+        {
+            PackageVersion version = Package.Current.Id.Version;
+            VersionText.Text =
+                $"v{version.Major}.{version.Minor}.{version.Build}";
+        }
+        catch
+        {
+            VersionText.Text = "Development build";
+        }
     }
 
     private async Task RunOnUiThreadAsync(Action action)
@@ -289,8 +306,8 @@ public sealed partial class SettingsPage : Page
             return;
         }
 
-        await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => action());
+        await Dispatcher.RunAsync(
+            CoreDispatcherPriority.Normal,
+            () => action());
     }
-
-    private sealed record MetricEditor(ToggleSwitch Toggle, TextBox Format);
 }

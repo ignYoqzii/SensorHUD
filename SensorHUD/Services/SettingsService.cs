@@ -90,6 +90,17 @@ internal static class SettingsService
     private static TelemetrySettings Normalize(TelemetrySettings settings)
     {
         settings.Metrics ??= [];
+        foreach (MetricPreference preference in settings.Metrics)
+        {
+            if (preference.DecimalPlaces is int decimalPlaces)
+            {
+                preference.DecimalPlaces = Math.Clamp(
+                    decimalPlaces,
+                    TelemetryDefaults.MinimumDecimalPlaces,
+                    TelemetryDefaults.MaximumDecimalPlaces);
+            }
+        }
+
         settings.Layout = settings.Layout == LayoutNames.Horizontal
             ? LayoutNames.Horizontal
             : LayoutNames.Vertical;

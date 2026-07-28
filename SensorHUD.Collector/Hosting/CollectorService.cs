@@ -145,11 +145,14 @@ internal sealed class CollectorService(
         {
             do
             {
+                TelemetrySample sample = collector.Sample();
                 TelemetrySnapshot snapshot = new()
                 {
                     SessionId = sessionId,
                     CollectorStatus = CollectorStates.Running,
-                    Values = collector.Sample(),
+                    CapturedAtUtc = DateTimeOffset.UtcNow,
+                    Diagnostics = sample.Diagnostics,
+                    Values = sample.Values,
                 };
 
                 // DropOldest means TryWrite normally succeeds and ensures that

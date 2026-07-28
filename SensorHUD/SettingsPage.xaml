@@ -4,123 +4,416 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:viewModels="using:SensorHUD.ViewModels"
     mc:Ignorable="d">
 
     <Page.Resources>
+        <!-- Shared cards keep every static and generated section visually
+             consistent without introducing custom control classes. -->
         <Style x:Key="SectionCardStyle" TargetType="Border">
-            <Setter Property="Padding" Value="14" />
-            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="18" />
+            <Setter Property="CornerRadius" Value="12" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="BorderBrush"
-                    Value="{ThemeResource SystemControlForegroundBaseMediumBrush}" />
+                    Value="{ThemeResource SystemControlForegroundBaseLowBrush}" />
             <Setter Property="Background"
-                    Value="Transparent" />
+                    Value="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}" />
+        </Style>
+
+        <Style x:Key="MetricEditorCardStyle" TargetType="Border">
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Background"
+                    Value="{ThemeResource SystemControlBackgroundBaseLowBrush}" />
+        </Style>
+
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="SectionDescriptionStyle" TargetType="TextBlock">
+            <Setter Property="Opacity" Value="0.68" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="DiagnosticLabelStyle" TargetType="TextBlock">
+            <Setter Property="Opacity" Value="0.65" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="DiagnosticValueStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextAlignment" Value="Right" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
     </Page.Resources>
 
     <Grid>
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel Padding="20" Spacing="12">
+            <StackPanel Width="Auto"
+                        MaxWidth="760"
+                        Padding="20,20,20,28"
+                        Spacing="16"
+                        HorizontalAlignment="Stretch">
+
+                <!-- A compact hero establishes hierarchy without consuming
+                     valuable space in Game Bar's settings window. -->
+                <Border Padding="20"
+                        CornerRadius="16">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#FF5968F2" Offset="0" />
+                            <GradientStop Color="#FF8B5CF6" Offset="1" />
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="SENSORHUD"
+                                       Foreground="#CCFFFFFF"
+                                       FontSize="11"
+                                       FontWeight="Bold"
+                                       CharacterSpacing="120" />
+                            <TextBlock Text="Make your overlay yours"
+                                       Foreground="White"
+                                       FontSize="25"
+                                       FontWeight="SemiBold"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Text="Changes appear instantly and save automatically."
+                                       Foreground="#D9FFFFFF"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Border Grid.Column="1"
+                                Margin="16,0,0,0"
+                                Width="48"
+                                Height="48"
+                                CornerRadius="12"
+                                Background="#26FFFFFF">
+                            <FontIcon Glyph="&#xE9D9;"
+                                      FontSize="23"
+                                      Foreground="White" />
+                        </Border>
+                    </Grid>
+                </Border>
+
                 <Border Style="{StaticResource SectionCardStyle}">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Layout"
-                                   FontSize="19"
-                                   FontWeight="SemiBold" />
-                        <ComboBox x:Name="LayoutBox"
-                                  Header="Direction"
-                                  HorizontalAlignment="Stretch"
-                                  SelectionChanged="Setting_Changed">
-                            <ComboBoxItem Content="Vertical" />
-                            <ComboBoxItem Content="Horizontal" />
-                        </ComboBox>
-                        <TextBox x:Name="HorizontalSeparatorBox"
-                                 Header="Horizontal Separator"
-                                 Description="Spacing is added automatically. Leave empty for a single space."
-                                 TextChanged="Setting_TextChanged" />
+                    <StackPanel Spacing="14">
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Collector health"
+                                       Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Text="Live status from the protected data collector."
+                                       Style="{StaticResource SectionDescriptionStyle}" />
+                        </StackPanel>
+
+                        <Grid ColumnSpacing="16" RowSpacing="9">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="1.35*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Ellipse x:Name="CollectorStatusIndicator"
+                                         Width="8"
+                                         Height="8"
+                                         Fill="#FFF5A524"
+                                         VerticalAlignment="Center" />
+                                <TextBlock Text="Collector"
+                                           Style="{StaticResource DiagnosticLabelStyle}" />
+                            </StackPanel>
+                            <TextBlock x:Name="CollectorStatusText"
+                                       Grid.Column="1"
+                                       Text="Connecting"
+                                       Style="{StaticResource DiagnosticValueStyle}" />
+
+                            <TextBlock Grid.Row="1"
+                                       Text="Last snapshot"
+                                       Style="{StaticResource DiagnosticLabelStyle}" />
+                            <TextBlock x:Name="LastSnapshotText"
+                                       Grid.Row="1"
+                                       Grid.Column="1"
+                                       Text="Waiting"
+                                       Style="{StaticResource DiagnosticValueStyle}" />
+
+                            <TextBlock Grid.Row="2"
+                                       Text="Administrator"
+                                       Style="{StaticResource DiagnosticLabelStyle}" />
+                            <TextBlock x:Name="AdministratorStatusText"
+                                       Grid.Row="2"
+                                       Grid.Column="1"
+                                       Text="Unknown"
+                                       Style="{StaticResource DiagnosticValueStyle}" />
+
+                            <TextBlock Grid.Row="3"
+                                       Text="PawnIO"
+                                       Style="{StaticResource DiagnosticLabelStyle}" />
+                            <TextBlock x:Name="PawnIoStatusText"
+                                       Grid.Row="3"
+                                       Grid.Column="1"
+                                       Text="Unknown"
+                                       Style="{StaticResource DiagnosticValueStyle}" />
+
+                            <TextBlock Grid.Row="4"
+                                       Text="Frame metrics"
+                                       Style="{StaticResource DiagnosticLabelStyle}" />
+                            <TextBlock x:Name="FrameMetricsStatusText"
+                                       Grid.Row="4"
+                                       Grid.Column="1"
+                                       Text="Waiting"
+                                       Style="{StaticResource DiagnosticValueStyle}" />
+
+                            <TextBlock Grid.Row="5"
+                                       Text="Processor"
+                                       Style="{StaticResource DiagnosticLabelStyle}" />
+                            <TextBlock x:Name="CpuStatusText"
+                                       Grid.Row="5"
+                                       Grid.Column="1"
+                                       Text="Not detected"
+                                       Style="{StaticResource DiagnosticValueStyle}" />
+
+                            <TextBlock Grid.Row="6"
+                                       Text="Graphics"
+                                       Style="{StaticResource DiagnosticLabelStyle}" />
+                            <TextBlock x:Name="GpuStatusText"
+                                       Grid.Row="6"
+                                       Grid.Column="1"
+                                       Text="Not detected"
+                                       Style="{StaticResource DiagnosticValueStyle}" />
+                        </Grid>
+
+                        <Border x:Name="LastErrorPanel"
+                                Padding="12"
+                                CornerRadius="8"
+                                Background="#26E5484D"
+                                Visibility="Collapsed">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="Latest connection error"
+                                           FontWeight="SemiBold"
+                                           Foreground="#FFFF8B8F" />
+                                <TextBlock x:Name="LastErrorText"
+                                           TextWrapping="Wrap"
+                                           Opacity="0.85" />
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </Border>
 
                 <Border Style="{StaticResource SectionCardStyle}">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Appearance"
-                                   FontSize="19"
-                                   FontWeight="SemiBold" />
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Layout"
+                                       Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Text="Choose how metrics flow inside the pinned widget."
+                                       Style="{StaticResource SectionDescriptionStyle}" />
+                        </StackPanel>
+                        <ComboBox Header="Direction"
+                                  HorizontalAlignment="Stretch"
+                                  ItemsSource="{x:Bind ViewModel.LayoutOptions, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.Layout, Mode=TwoWay}" />
+                        <TextBox Header="Horizontal separator"
+                                 Description="Spacing is added automatically. Leave empty for a single space."
+                                 Text="{x:Bind ViewModel.HorizontalSeparator, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                </Border>
 
-                        <TextBlock Text="Background Opacity" FontWeight="SemiBold" />
-                        <Grid>
+                <Border Style="{StaticResource SectionCardStyle}">
+                    <StackPanel Spacing="13">
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Appearance"
+                                       Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Text="Typography stays crisp while only the widget background fades."
+                                       Style="{StaticResource SectionDescriptionStyle}" />
+                        </StackPanel>
+
+                        <TextBlock Text="Background opacity"
+                                   FontWeight="SemiBold" />
+                        <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="52" />
                             </Grid.ColumnDefinitions>
-                            <Slider x:Name="OpacitySlider"
-                                    Minimum="0"
+                            <Slider Minimum="0"
                                     Maximum="100"
                                     StepFrequency="1"
-                                    ValueChanged="OpacitySlider_ValueChanged" />
-                            <TextBlock x:Name="OpacityValue"
-                                       Grid.Column="1"
+                                    Value="{x:Bind ViewModel.BackgroundOpacityPercent, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{x:Bind ViewModel.BackgroundOpacityText, Mode=OneWay}"
                                        HorizontalAlignment="Right"
-                                       VerticalAlignment="Center" />
+                                       VerticalAlignment="Center"
+                                       FontWeight="SemiBold" />
                         </Grid>
 
-                        <TextBox x:Name="FontFamilyBox"
-                                 Header="Font family"
+                        <TextBox Header="Font family"
                                  PlaceholderText="Segoe UI"
-                                 TextChanged="Setting_TextChanged" />
+                                 Text="{x:Bind ViewModel.FontFamily, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-                        <ComboBox x:Name="FontWeightBox"
-                                  Header="Font weight"
+                        <ComboBox Header="Font weight"
                                   HorizontalAlignment="Stretch"
-                                  SelectionChanged="Setting_Changed">
-                            <ComboBoxItem Content="Light" />
-                            <ComboBoxItem Content="Normal" />
-                            <ComboBoxItem Content="SemiBold" />
-                            <ComboBoxItem Content="Bold" />
-                            <ComboBoxItem Content="Black" />
-                        </ComboBox>
+                                  ItemsSource="{x:Bind ViewModel.FontWeightOptions, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.FontWeight, Mode=TwoWay}" />
+                        <TextBlock Text="Applies to labels and device names. {value} and {unit} always use normal weight."
+                                   Margin="0,-7,0,0"
+                                   FontSize="12"
+                                   Style="{StaticResource SectionDescriptionStyle}" />
 
-                        <TextBlock Text="Font size" FontWeight="SemiBold" />
-                        <Grid>
+                        <TextBlock Text="Font size"
+                                   FontWeight="SemiBold" />
+                        <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="52" />
                             </Grid.ColumnDefinitions>
-                            <Slider x:Name="FontSizeSlider"
-                                    Minimum="8"
-                                    Maximum="48"
+                            <Slider Minimum="8"
+                                    Maximum="72"
                                     StepFrequency="1"
-                                    ValueChanged="FontSizeSlider_ValueChanged" />
-                            <TextBlock x:Name="FontSizeValue"
-                                       Grid.Column="1"
+                                    Value="{x:Bind ViewModel.FontSize, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{x:Bind ViewModel.FontSizeText, Mode=OneWay}"
                                        HorizontalAlignment="Right"
-                                       VerticalAlignment="Center" />
+                                       VerticalAlignment="Center"
+                                       FontWeight="SemiBold" />
                         </Grid>
 
-                        <TextBox x:Name="FontColorBox"
-                                 Header="Font color"
+                        <TextBox Header="Font color"
                                  PlaceholderText="#FFFFFFFF"
                                  Description="Use #RRGGBB or #AARRGGBB."
-                                 TextChanged="Setting_TextChanged" />
+                                 Text="{x:Bind ViewModel.FontColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </Border>
 
-                <StackPanel Spacing="4">
-                    <TextBlock Text="Displayed Metrics"
-                               FontSize="21"
+                <StackPanel Margin="2,4,2,0" Spacing="4">
+                    <TextBlock Text="Displayed metrics"
+                               FontSize="23"
                                FontWeight="SemiBold" />
-                    <TextBlock Text="Each hardware section controls what is shown and how it is formatted. Available tokens: {value}, {unit}, {name}, and {device}."
-                               Opacity="0.72"
-                               TextWrapping="Wrap" />
+                    <TextBlock Text="Choose a precision and customize the template for every reading. Available tokens: {value}, {unit}, {name}, and {device}."
+                               Style="{StaticResource SectionDescriptionStyle}" />
                 </StackPanel>
 
-                <!-- One card is generated for frame rate, CPU, every GPU,
-                     memory, and network from the central metric catalog. -->
-                <StackPanel x:Name="MetricSections" Spacing="12" />
+                <!-- The central catalog becomes bindable sections and metrics.
+                     A newly detected GPU therefore uses this same template. -->
+                <ItemsControl ItemsSource="{x:Bind ViewModel.MetricSections, Mode=OneWay}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="viewModels:MetricSectionViewModel">
+                            <Border Margin="0,0,0,14"
+                                    Style="{StaticResource SectionCardStyle}">
+                                <StackPanel Spacing="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Bind Name}"
+                                                   Style="{StaticResource SectionTitleStyle}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{x:Bind MetricCountText}"
+                                                   FontSize="12"
+                                                   Opacity="0.58"
+                                                   VerticalAlignment="Center" />
+                                    </Grid>
 
-                <Button Content="Reset defaults"
-                        HorizontalAlignment="Left"
-                        CornerRadius="8"
-                        Click="ResetButton_Click" />
+                                    <ItemsControl ItemsSource="{x:Bind Metrics}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="viewModels:MetricSettingsViewModel">
+                                                <Border Margin="0,0,0,8"
+                                                        Style="{StaticResource MetricEditorCardStyle}">
+                                                    <StackPanel Spacing="8">
+                                                        <ToggleSwitch Header="{x:Bind Name}"
+                                                                      IsOn="{x:Bind IsEnabled, Mode=TwoWay}"
+                                                                      OnContent="On"
+                                                                      OffContent="Off" />
+                                                        <TextBox Header="Format"
+                                                                 Text="{x:Bind Format, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                 Description="{x:Bind UnitDescription}"
+                                                                 HorizontalAlignment="Stretch" />
+                                                        <ComboBox Header="Decimal precision"
+                                                                  ItemsSource="{x:Bind PrecisionOptions}"
+                                                                  SelectedItem="{x:Bind SelectedPrecision, Mode=TwoWay}"
+                                                                  HorizontalAlignment="Stretch">
+                                                            <ComboBox.ItemTemplate>
+                                                                <DataTemplate x:DataType="viewModels:PrecisionOption">
+                                                                    <TextBlock Text="{x:Bind Label}" />
+                                                                </DataTemplate>
+                                                            </ComboBox.ItemTemplate>
+                                                        </ComboBox>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Border Style="{StaticResource SectionCardStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Reset configuration"
+                                       FontSize="17"
+                                       FontWeight="SemiBold" />
+                            <TextBlock Text="Restore every display and metric setting to its default."
+                                       Style="{StaticResource SectionDescriptionStyle}" />
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Margin="16,0,0,0"
+                                Content="Reset defaults"
+                                VerticalAlignment="Center"
+                                CornerRadius="8"
+                                Click="ResetButton_Click" />
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource SectionCardStyle}">
+                    <StackPanel Spacing="10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="About SensorHUD"
+                                           Style="{StaticResource SectionTitleStyle}" />
+                                <TextBlock Text="Fast PC telemetry for Xbox Game Bar"
+                                           Style="{StaticResource SectionDescriptionStyle}" />
+                            </StackPanel>
+                            <Border Grid.Column="1"
+                                    Padding="10,5"
+                                    CornerRadius="10"
+                                    Background="#265968F2">
+                                <TextBlock x:Name="VersionText"
+                                           Text="Version"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           FontSize="12"
+                                           FontWeight="SemiBold" />
+                            </Border>
+                        </Grid>
+                        <TextBlock Text="Sensor readings and preferences stay on this computer. SensorHUD has no account, advertising, analytics, cloud service, or remote telemetry."
+                                   TextWrapping="Wrap"
+                                   Opacity="0.78" />
+                        <TextBlock Text="Created by yoqzii - MIT License"
+                                   FontSize="12"
+                                   Opacity="0.58" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
     </Grid>

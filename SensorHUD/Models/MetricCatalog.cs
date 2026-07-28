@@ -6,119 +6,290 @@ using SensorHUD.Shared;
 namespace SensorHUD.Models;
 
 /// <summary>
-/// The single catalog for metric labels, units, formats, grouping, and order.
-/// Add or adjust a metric here; the display and settings UI adapt themselves.
-/// GPU and Hardware definitions are generated dynamically to support real device names.
+/// Single source of truth for metric labels, units, default templates,
+/// visibility, grouping, and display order. UI pages consume this catalog and
+/// therefore need no hardware-specific control definitions.
 /// </summary>
 internal static class MetricCatalog
 {
-    private static readonly MetricSection FrameRateSection = new("frame-rate", "Frame rate", 0);
-    private static readonly MetricSection CpuSection = new("cpu", "CPU", 100);
-    private static readonly MetricSection MemorySection = new("memory", "Memory", 300);
-    private static readonly MetricSection NetworkSection = new("network", "Network", 400);
+    private const int FrameRateSectionOrder = 0;
+    private const int CpuSectionOrder = 100;
+    private const int FirstGpuSectionOrder = 200;
+    private const int MemorySectionOrder = 300;
+    private const int NetworkSectionOrder = 400;
 
+    private static readonly MetricSection FrameRateSection =
+        new("frame-rate", "Frame rate", FrameRateSectionOrder);
+    private static readonly MetricSection CpuSection =
+        new("cpu", "CPU", CpuSectionOrder);
+    private static readonly MetricSection MemorySection =
+        new("memory", "Memory", MemorySectionOrder);
+    private static readonly MetricSection NetworkSection =
+        new("network", "Network", NetworkSectionOrder);
+
+    /// <summary>
+    /// Creates the complete catalog for one snapshot. GPU sections are dynamic
+    /// because machines can expose any number of graphics adapters.
+    /// </summary>
     public static IReadOnlyList<MetricDefinition> CreateForSnapshot(
         TelemetrySnapshot? snapshot)
     {
-        List<MetricDefinition> result = [];
+        IReadOnlyList<TelemetryValue> readings = snapshot?.Values ?? [];
+        string cpuName =
+            FindDeviceName(readings, MetricCategories.Cpu, "CPU");
+        string memoryName =
+            FindDeviceName(readings, MetricCategories.Ram, "Memory");
 
-        // 1. Extract dynamic names from the snapshot if available
-        string cpuDeviceName = snapshot?.Values
-            .FirstOrDefault(v => v.Category == MetricCategories.Cpu && !string.IsNullOrWhiteSpace(v.DeviceName))?.DeviceName ?? "CPU";
+        List<MetricDefinition> definitions =
+        [
+            CreateMetric(
+                MetricIds.CpuUsage,
+                "Usage",
+                CpuSection,
+                order: 0,
+                format: "{device} Usage: {value}{unit}",
+                decimals: 0,
+                unit: MetricUnits.Percent,
+                deviceName: cpuName),
+            CreateMetric(
+                MetricIds.CpuTemperature,
+                "Temperature",
+                CpuSection,
+                order: 1,
+                format: "{device} Temp: {value}{unit}",
+                decimals: 0,
+                unit: MetricUnits.Celsius,
+                deviceName: cpuName),
+            CreateMetric(
+                MetricIds.RamUsage,
+                "Usage",
+                MemorySection,
+                order: 0,
+                format: "{device} Usage: {value}{unit}",
+                decimals: 0,
+                unit: MetricUnits.Percent,
+                deviceName: memoryName),
+            CreateMetric(
+                MetricIds.RamUsed,
+                "Used",
+                MemorySection,
+                order: 1,
+                format: "{device} Used: {value} {unit}",
+                decimals: 1,
+                unit: MetricUnits.Gigabytes,
+                deviceName: memoryName,
+                enabledByDefault: false),
+            CreateMetric(
+                MetricIds.RamTotal,
+                "Total",
+                MemorySection,
+                order: 2,
+                format: "{device} Total: {value} {unit}",
+                decimals: 1,
+                unit: MetricUnits.Gigabytes,
+                deviceName: memoryName,
+                enabledByDefault: false),
+            CreateMetric(
+                MetricIds.Fps,
+                "FPS",
+                FrameRateSection,
+                order: 0,
+                format: "FPS: {value} {unit}",
+                decimals: 0,
+                unit: MetricUnits.FramesPerSecond,
+                deviceName: "FPS"),
+            CreateMetric(
+                MetricIds.OnePercentLow,
+                "1% Low",
+                FrameRateSection,
+                order: 1,
+                format: "1% Low: {value} {unit}",
+                decimals: 0,
+                unit: MetricUnits.FramesPerSecond,
+                deviceName: "1% Low"),
+            CreateMetric(
+                MetricIds.Frametime,
+                "Frametime",
+                FrameRateSection,
+                order: 2,
+                format: "Frametime: {value} {unit}",
+                decimals: 1,
+                unit: MetricUnits.Milliseconds,
+                deviceName: "Frametime"),
+            CreateMetric(
+                MetricIds.NetworkSend,
+                "Send",
+                NetworkSection,
+                order: 0,
+                format: "↑ {value} {unit}",
+                decimals: 1,
+                unit: MetricUnits.MegabitsPerSecond,
+                deviceName: "Network"),
+            CreateMetric(
+                MetricIds.NetworkReceive,
+                "Receive",
+                NetworkSection,
+                order: 1,
+                format: "↓ {value} {unit}",
+                decimals: 1,
+                unit: MetricUnits.MegabitsPerSecond,
+                deviceName: "Network"),
+        ];
 
-        string ramDeviceName = snapshot?.Values
-            .FirstOrDefault(v => v.Category == MetricCategories.Ram && !string.IsNullOrWhiteSpace(v.DeviceName))?.DeviceName ?? "Memory";
+        AddGpuDefinitions(definitions, readings);
 
-        // 2. Add CPU Metrics with dynamic device names
-        result.Add(CreateMetric(MetricIds.CpuUsage, "Usage", CpuSection, 0, "{device} Usage: {value}{unit}", 0, MetricUnits.Percent, cpuDeviceName));
-        result.Add(CreateMetric(MetricIds.CpuTemperature, "Temperature", CpuSection, 1, "{device} Temp: {value}{unit}", 0, MetricUnits.Celsius, cpuDeviceName));
-
-        // 3. Add RAM Metrics with dynamic device names
-        result.Add(CreateMetric(MetricIds.RamUsage, "Usage", MemorySection, 0, "{device} Usage: {value}{unit}", 0, MetricUnits.Percent, ramDeviceName));
-
-        // 4. Add Static/Global Metrics (FPS, Network)
-        result.Add(CreateMetric(MetricIds.Fps, "FPS", FrameRateSection, 0, "FPS: {value} {unit}", 0, MetricUnits.FramesPerSecond, "FPS"));
-        result.Add(CreateMetric(MetricIds.OnePercentLow, "1% low", FrameRateSection, 1, "1% low: {value} {unit}", 0, MetricUnits.FramesPerSecond, "1% low"));
-        result.Add(CreateMetric(MetricIds.Frametime, "Frametime", FrameRateSection, 2, "Frametime: {value} {unit}", 1, MetricUnits.Milliseconds, "Frametime"));
-        result.Add(CreateMetric(MetricIds.NetworkSend, "Send", NetworkSection, 0, "↑ {value} {unit}", 1, MetricUnits.MegabitsPerSecond, "Network"));
-        result.Add(CreateMetric(MetricIds.NetworkReceive, "Receive", NetworkSection, 1, "↓ {value} {unit}", 1, MetricUnits.MegabitsPerSecond, "Network"));
-
-        // 5. Process GPUs dynamically
-        IEnumerable<IGrouping<string, TelemetryValue>> gpuDevices = snapshot is null
-            ? []
-            : snapshot.Values
-                .Where(value => value.Category == MetricCategories.Gpu)
-                .GroupBy(value =>
-                {
-                    // Extract the unique device identifier between 'gpu.' and the suffix (.usage, .temperature, etc.)
-                    string id = value.Id;
-                    if (id.StartsWith(MetricIds.GpuPrefix, StringComparison.Ordinal))
-                    {
-                        int suffixIndex = id.LastIndexOf('.');
-                        if (suffixIndex > MetricIds.GpuPrefix.Length)
-                        {
-                            return id[..suffixIndex]; // e.g., "gpu.abc1234567"
-                        }
-                    }
-                    return id;
-                })
-                .OrderBy(
-                    group => group.First().DeviceName,
-                    StringComparer.CurrentCultureIgnoreCase);
-
-        int gpuIndex = 0;
-        foreach (IGrouping<string, TelemetryValue> deviceGroup in gpuDevices)
-        {
-            string deviceName = string.IsNullOrWhiteSpace(deviceGroup.First().DeviceName)
-                ? $"GPU {gpuIndex + 1}"
-                : deviceGroup.First().DeviceName;
-
-            MetricSection section = new(
-                deviceGroup.Key,
-                $"GPU - {deviceName}", // Displays clean section title like "GPU - NVIDIA GeForce RTX 4080"
-                200 + gpuIndex);
-
-            foreach (TelemetryValue value in deviceGroup.OrderBy(item => item.Id, StringComparer.Ordinal))
-            {
-                // Determine the correct suffix label/format based on MetricIds definitions
-                string formatString;
-                string metricName = value.Name;
-
-                if (value.Id.EndsWith(MetricIds.VramSuffix, StringComparison.Ordinal))
-                {
-                    formatString = "{device} VRAM: {value}{unit}";
-                }
-                else if (value.Id.EndsWith(MetricIds.TemperatureSuffix, StringComparison.Ordinal))
-                {
-                    formatString = "{device} Temp: {value}{unit}";
-                }
-                else if (value.Id.EndsWith(MetricIds.UsageSuffix, StringComparison.Ordinal))
-                {
-                    formatString = "{device} Usage: {value}{unit}";
-                }
-                else
-                {
-                    formatString = "{device}: {value}{unit}";
-                }
-
-                result.Add(new MetricDefinition(
-                    value.Id,
-                    metricName,
-                    section,
-                    value.Unit,
-                    formatString,
-                    DecimalPlaces: 0,
-                    Order: MetricOrder(value.Id),
-                    DeviceName: deviceName));
-            }
-
-            gpuIndex++;
-        }
-
-        return result
+        return definitions
             .OrderBy(definition => definition.Section.Order)
             .ThenBy(definition => definition.Order)
             .ToArray();
+    }
+
+    private static void AddGpuDefinitions(
+        List<MetricDefinition> definitions,
+        IReadOnlyList<TelemetryValue> readings)
+    {
+        IEnumerable<IGrouping<string, TelemetryValue>> devices = readings
+            .Where(value => value.Category == MetricCategories.Gpu)
+            .GroupBy(GetGpuDeviceKey)
+            .OrderBy(
+                group => group.First().DeviceName,
+                StringComparer.CurrentCultureIgnoreCase);
+
+        int gpuIndex = 0;
+        foreach (IGrouping<string, TelemetryValue> device in devices)
+        {
+            string deviceName =
+                string.IsNullOrWhiteSpace(device.First().DeviceName)
+                    ? $"GPU {gpuIndex + 1}"
+                    : device.First().DeviceName;
+            MetricSection section = new(
+                device.Key,
+                $"GPU - {deviceName}",
+                FirstGpuSectionOrder + gpuIndex);
+
+            definitions.AddRange(device
+                .OrderBy(value => GetGpuMetricOrder(value.Id))
+                .ThenBy(value => value.Id, StringComparer.Ordinal)
+                .Select(value =>
+                    CreateGpuDefinition(value, section, deviceName)));
+            gpuIndex++;
+        }
+    }
+
+    private static MetricDefinition CreateGpuDefinition(
+        TelemetryValue reading,
+        MetricSection section,
+        string deviceName)
+    {
+        bool isAbsoluteMemory =
+            reading.Id.EndsWith(
+                MetricIds.VramUsedSuffix,
+                StringComparison.Ordinal) ||
+            reading.Id.EndsWith(
+                MetricIds.VramTotalSuffix,
+                StringComparison.Ordinal);
+
+        return new MetricDefinition(
+            reading.Id,
+            reading.Name,
+            section,
+            reading.Unit,
+            GetGpuDefaultFormat(reading.Id),
+            DecimalPlaces:
+                reading.Unit == MetricUnits.Gigabytes ? 1 : 0,
+            Order: GetGpuMetricOrder(reading.Id),
+            EnabledByDefault: !isAbsoluteMemory,
+            DeviceName: deviceName);
+    }
+
+    private static string GetGpuDefaultFormat(string metricId)
+    {
+        if (metricId.EndsWith(
+            MetricIds.VramUsedSuffix,
+            StringComparison.Ordinal))
+        {
+            return "{device} VRAM Used: {value} {unit}";
+        }
+
+        if (metricId.EndsWith(
+            MetricIds.VramTotalSuffix,
+            StringComparison.Ordinal))
+        {
+            return "{device} VRAM Total: {value} {unit}";
+        }
+
+        if (metricId.EndsWith(
+            MetricIds.VramSuffix,
+            StringComparison.Ordinal))
+        {
+            return "{device} VRAM: {value}{unit}";
+        }
+
+        if (metricId.EndsWith(
+            MetricIds.TemperatureSuffix,
+            StringComparison.Ordinal))
+        {
+            return "{device} Temp: {value}{unit}";
+        }
+
+        return metricId.EndsWith(
+            MetricIds.UsageSuffix,
+            StringComparison.Ordinal)
+                ? "{device} Usage: {value}{unit}"
+                : "{device}: {value}{unit}";
+    }
+
+    private static int GetGpuMetricOrder(string metricId)
+    {
+        if (metricId.EndsWith(
+            MetricIds.UsageSuffix,
+            StringComparison.Ordinal))
+        {
+            return 0;
+        }
+
+        if (metricId.EndsWith(
+            MetricIds.TemperatureSuffix,
+            StringComparison.Ordinal))
+        {
+            return 1;
+        }
+
+        if (metricId.EndsWith(
+            MetricIds.VramSuffix,
+            StringComparison.Ordinal))
+        {
+            return 2;
+        }
+
+        return metricId.EndsWith(
+            MetricIds.VramUsedSuffix,
+            StringComparison.Ordinal)
+                ? 3
+                : 4;
+    }
+
+    private static string GetGpuDeviceKey(TelemetryValue reading)
+    {
+        int suffixIndex = reading.Id.LastIndexOf('.');
+        return reading.Id.StartsWith(
+                MetricIds.GpuPrefix,
+                StringComparison.Ordinal) &&
+            suffixIndex > MetricIds.GpuPrefix.Length
+                ? reading.Id[..suffixIndex]
+                : reading.Id;
+    }
+
+    private static string FindDeviceName(
+        IReadOnlyList<TelemetryValue> readings,
+        string category,
+        string fallback)
+    {
+        return readings
+            .FirstOrDefault(value =>
+                value.Category == category &&
+                !string.IsNullOrWhiteSpace(value.DeviceName))
+            ?.DeviceName ?? fallback;
     }
 
     private static MetricDefinition CreateMetric(
@@ -129,7 +300,8 @@ internal static class MetricCatalog
         string format,
         int decimals,
         string unit,
-        string deviceName)
+        string deviceName,
+        bool enabledByDefault = true)
     {
         return new MetricDefinition(
             id,
@@ -139,16 +311,7 @@ internal static class MetricCatalog
             format,
             decimals,
             order,
+            enabledByDefault,
             DeviceName: deviceName);
-    }
-
-    private static int MetricOrder(string metricId)
-    {
-        if (metricId.EndsWith(MetricIds.UsageSuffix, StringComparison.Ordinal))
-        {
-            return 0;
-        }
-
-        return metricId.EndsWith(MetricIds.TemperatureSuffix, StringComparison.Ordinal) ? 1 : 2;
     }
 }

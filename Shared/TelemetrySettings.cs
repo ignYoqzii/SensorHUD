@@ -36,6 +36,11 @@ public sealed class MetricPreference
     public bool IsEnabled { get; set; } = true;
 
     public string Format { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Null uses the catalog's sensible default for this metric.
+    /// </summary>
+    public int? DecimalPlaces { get; set; }
 }
 
 public static class LayoutNames
@@ -59,12 +64,14 @@ public static class FontWeightNames
 public static class TelemetryDefaults
 {
     public const string Layout = LayoutNames.Vertical;
-    public const string HorizontalSeparator = "•";
+    public const string HorizontalSeparator = "|";
     public const double BackgroundOpacity = 0.72;
     public const string FontFamily = "Segoe UI";
     public const string FontWeight = FontWeightNames.SemiBold;
     public const double FontSize = 18;
     public const double MinimumFontSize = 8;
     public const double MaximumFontSize = 72;
+    public const int MinimumDecimalPlaces = 0;
+    public const int MaximumDecimalPlaces = 2;
     public const string FontColor = "#FFFFFFFF";
 }

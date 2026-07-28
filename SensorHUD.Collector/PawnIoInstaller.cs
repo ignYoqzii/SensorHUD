@@ -17,12 +17,12 @@ internal static class PawnIoInstaller
         @"SYSTEM\CurrentControlSet\Services\PawnIO";
     private static readonly Version RequiredVersion = new(2, 2, 0);
 
-    public static async Task<string?> EnsureInstalledAsync()
+    public static async Task<PawnIoResult> EnsureInstalledAsync()
     {
         InstallationInfo installation = ReadInstallation();
         if (installation.IsUsable)
         {
-            return null;
+            return PawnIoResult.Ready(installation.Version);
         }
 
         string installer = Path.Combine(
@@ -30,7 +30,8 @@ internal static class PawnIoInstaller
             InstallerFileName);
         if (!File.Exists(installer))
         {
-            return $"Bundled {InstallerFileName} is missing.";
+            return PawnIoResult.Failed(
+                $"Bundled {InstallerFileName} is missing.");
         }
 
         try
@@ -53,23 +54,42 @@ internal static class PawnIoInstaller
             await process.WaitForExitAsync();
             if (process.ExitCode is not 0 and not 3010)
             {
-                return $"PawnIO installation failed with exit code {process.ExitCode}.";
+                return PawnIoResult.Failed(
+                    $"PawnIO installation failed with exit code {process.ExitCode}.");
             }
 
             InstallationInfo verified = ReadInstallation();
             if (!verified.IsUsable)
             {
-                return "PawnIO installation completed, but its required driver registration or version could not be verified.";
+                return PawnIoResult.Failed(
+                    "PawnIO installation completed, but its required driver registration or version could not be verified.");
             }
 
             return process.ExitCode == 3010
-                ? "PawnIO was installed, but Windows must be restarted before protected hardware sensors become available."
-                : null;
+                ? PawnIoResult.RestartRequired(verified.Version)
+                : PawnIoResult.Ready(verified.Version);
         }
         catch (Exception exception)
         {
-            return $"PawnIO installation failed: {exception.Message}";
+            return PawnIoResult.Failed(
+                $"PawnIO installation failed: {exception.Message}");
         }
+    }
+
+    internal sealed record PawnIoResult(string Status, string? Error)
+    {
+        public static PawnIoResult Ready(Version? version) =>
+            new($"Ready · version {version}", null);
+
+        public static PawnIoResult RestartRequired(Version? version)
+        {
+            const string message =
+                "PawnIO was installed, but Windows must be restarted before protected hardware sensors become available.";
+            return new($"Restart required · version {version}", message);
+        }
+
+        public static PawnIoResult Failed(string error) =>
+            new($"Unavailable · {error}", error);
     }
 
     private static InstallationInfo ReadInstallation()

@@ -13,6 +13,7 @@ using Windows.UI.Core;
 using Windows.UI.Text;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 
@@ -185,14 +186,29 @@ public sealed partial class TelemetryPage : Page
 
         if (_settings.Layout == LayoutNames.Horizontal)
         {
-            List<string> rendered = [];
             List<string> errors = [];
+            HorizontalText.Inlines.Clear();
+            bool firstMetric = true;
 
             foreach (MetricDefinition definition in _definitions.Where(IsMetricEnabled))
             {
                 readingById.TryGetValue(definition.Id, out TelemetryValue? reading);
                 MetricPreference? preference = FindPreference(definition.Id);
-                rendered.Add(MetricFormatter.Format(definition, reading, preference?.Format));
+                if (!firstMetric)
+                {
+                    HorizontalText.Inlines.Add(new Run
+                    {
+                        Text = CreateHorizontalSeparator(),
+                    });
+                }
+
+                AppendMetricParts(
+                    HorizontalText,
+                    MetricFormatter.FormatParts(
+                        definition,
+                        reading,
+                        preference));
+                firstMetric = false;
 
                 if (!string.IsNullOrWhiteSpace(reading?.Error))
                 {
@@ -200,9 +216,6 @@ public sealed partial class TelemetryPage : Page
                 }
             }
 
-            HorizontalText.Text = string.Join(
-                CreateHorizontalSeparator(),
-                rendered);
             ToolTipService.SetToolTip(
                 HorizontalText,
                 errors.Count == 0 ? null : string.Join(Environment.NewLine, errors));
@@ -218,17 +231,50 @@ public sealed partial class TelemetryPage : Page
 
             readingById.TryGetValue(definition.Id, out TelemetryValue? reading);
             MetricPreference? preference = FindPreference(definition.Id);
-            text.Text = MetricFormatter.Format(definition, reading, preference?.Format);
+            text.Inlines.Clear();
+            AppendMetricParts(
+                text,
+                MetricFormatter.FormatParts(
+                    definition,
+                    reading,
+                    preference));
 
             // An error tooltip gives detail without cluttering a pinned overlay.
             ToolTipService.SetToolTip(text, reading?.Error);
         }
     }
 
+    /// <summary>
+    /// Converts formatter roles into lightweight XAML runs. Values are
+    /// slightly larger and units are slightly smaller. Both intentionally use
+    /// normal weight; the user's weight applies only to surrounding text.
+    /// </summary>
+    private void AppendMetricParts(
+        TextBlock target,
+        IReadOnlyList<MetricTextPart> parts)
+    {
+        foreach (MetricTextPart part in parts)
+        {
+            Run run = new() { Text = part.Text };
+            if (part.Role == MetricTextRole.Value)
+            {
+                run.FontWeight = FontWeights.Normal;
+                run.FontSize = _settings.FontSize * 1.06;
+            }
+            else if (part.Role == MetricTextRole.Unit)
+            {
+                run.FontWeight = FontWeights.Normal;
+                run.FontSize = Math.Max(8, _settings.FontSize * 0.82);
+            }
+
+            target.Inlines.Add(run);
+        }
+    }
+
     private bool IsMetricEnabled(MetricDefinition definition)
     {
         MetricPreference? preference = FindPreference(definition.Id);
-        return preference?.IsEnabled ?? true;
+        return preference?.IsEnabled ?? definition.EnabledByDefault;
     }
 
     private void ApplyTextAppearance(TextBlock text)

@@ -43,18 +43,18 @@ internal sealed class TelemetryPipeServer
 
     private NamedPipeServerStream Create(string pipeName)
     {
+        // LABEL_SECURITY_INFORMATION requires WRITE_OWNER on the handle.
+        // Request it at creation; the DACL still controls every client.
         NamedPipeServerStream pipe = NamedPipeServerStreamAcl.Create(
             pipeName,
             PipeDirection.InOut,
             maxNumberOfServerInstances: 1,
-            PipeTransmissionMode.Byte,
-            PipeOptions.Asynchronous | PipeOptions.WriteThrough,
-            PipeBufferBytes,
-            PipeBufferBytes,
-            _security,
-            HandleInheritability.None,
-            // LABEL_SECURITY_INFORMATION requires WRITE_OWNER on the handle.
-            // Request it at creation; the DACL still controls every client.
+            transmissionMode: PipeTransmissionMode.Byte,
+            options: PipeOptions.Asynchronous | PipeOptions.WriteThrough,
+            inBufferSize: PipeBufferBytes,
+            outBufferSize: PipeBufferBytes,
+            pipeSecurity: _security,
+            inheritability: HandleInheritability.None,
             additionalAccessRights: PipeAccessRights.TakeOwnership);
 
         try
