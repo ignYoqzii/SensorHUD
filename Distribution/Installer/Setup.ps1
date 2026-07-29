@@ -107,7 +107,7 @@ if ($Uninstall) {
 }
 
 if (![Environment]::Is64BitOperatingSystem) {
-    throw 'SensorHUD 0.0.1 requires 64-bit Windows.'
+    throw 'SensorHUD requires 64-bit Windows.'
 }
 
 $packages = @(

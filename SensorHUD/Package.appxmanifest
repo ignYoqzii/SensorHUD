@@ -44,6 +44,7 @@
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
       </uap:VisualElements>
       <Extensions>
+        <!-- IDs must match Infrastructure/FrontendConstants.cs. -->
         <!-- The visible, pin-friendly telemetry widget. -->
         <uap3:Extension Category="windows.appExtension">
           <uap3:AppExtension Name="microsoft.gameBarUIExtension"
@@ -59,6 +60,8 @@
                 <ActivateAfterInstall>true</ActivateAfterInstall>
                 <FavoriteAfterInstall>true</FavoriteAfterInstall>
                 <Window>
+                  <!-- Keep these values synchronized with
+                       Infrastructure/FrontendConstants.cs. -->
                   <AllowForegroundTransparency>true</AllowForegroundTransparency>
                   <Size>
                     <Height>300</Height>
@@ -88,11 +91,13 @@
             <uap3:Properties>
               <GameBarWidget Type="Settings">
                 <Window>
+                  <!-- Keep these values synchronized with
+                       Infrastructure/FrontendConstants.cs. -->
                   <Size>
                     <Height>650</Height>
-                    <Width>460</Width>
+                    <Width>520</Width>
                     <MinHeight>400</MinHeight>
-                    <MinWidth>360</MinWidth>
+                    <MinWidth>480</MinWidth>
                     <MaxHeight>900</MaxHeight>
                     <MaxWidth>700</MaxWidth>
                   </Size>
@@ -109,7 +114,7 @@
         <!--
           This process has no UI. The widget launches it using the "Collector"
           group so desktop-only hardware and ETW APIs remain outside UWP.
-          GroupId must match CollectorProtocol.FullTrustGroup in shared code.
+          GroupId must match CollectorProtocol.FullTrustGroup in SensorHUD.Core.
         -->
         <desktop:Extension Category="windows.fullTrustProcess"
                            Executable="Collector\SensorHUD Data Collector.exe">

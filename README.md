@@ -39,6 +39,8 @@ SensorHUD puts live system information inside the Game Bar overlay,
 where it remains visible without switching away from a game. The widget is
 designed to be compact, responsive, and useful at a glance.
 
+![SensorHUD telemetry and settings widgets open in Xbox Game Bar](docs/images/sensorhud-game-bar-preview.png)
+
 | Live telemetry | Flexible presentation | Local by design |
 | --- | --- | --- |
 | CPU, GPU, memory, network, frame rate, temperatures, load, and dedicated memory | Configurable metrics, templates, decimal precision, layout, colors, typography, and pinning | No account, advertising, analytics, cloud service, or remote telemetry |
@@ -58,7 +60,7 @@ designed to be compact, responsive, and useful at a glance.
 ### Install
 
 1. Open the [latest GitHub release](../../releases/latest).
-2. Download `SensorHUD-0.0.1-x64.zip`.
+2. Download the `SensorHUD-<version>-x64.zip` archive.
 3. Extract the entire ZIP to a normal folder.
 4. Double-click `Install.cmd`.
 5. Accept the administrator prompt used to trust the `yoqzii` release
@@ -134,13 +136,47 @@ flowchart LR
 
 | Project | Responsibility |
 | --- | --- |
-| `SensorHUD` | Packaged UWP interface hosted by Xbox Game Bar. It stays inside the application container and has no direct low-level hardware access. |
-| `SensorHUD.Collector` | Same-package, windowless full-trust process that reads sensors, manages the PawnIO prerequisite, and publishes telemetry. |
-| `Shared` | Small IPC contract and serialization layer shared by both processes. It contains no user-interface or hardware-provider behavior. |
+| `SensorHUD` | Packaged UWP frontend hosted by Xbox Game Bar. It owns widget lifecycle, settings, presentation, and the reconnecting collector connection; it has no direct low-level hardware access. |
+| `SensorHUD.Collector` | Same-package, elevated and windowless backend. It owns PawnIO readiness, LibreHardwareMonitor, ETW capture, sampling, and the secured pipe server. |
+| `SensorHUD.Core` | Platform-independent metric registry, settings model, telemetry contracts, versioned protocol envelope, and source-generated JSON metadata shared by both processes. |
 
 The privileged collector is isolated from the widget. Communication crosses a
 package-scoped named pipe whose client identity is verified before telemetry
-is exchanged.
+is exchanged. The pipe has a strict size-limited, length-prefixed protocol.
+Session identity exists only in the message envelope, while telemetry
+snapshots contain capture time, typed health, and readings.
+
+The current protocol starts at version 1. The project was unpublished when
+this architecture was introduced, so there is no earlier protocol fallback,
+settings migration, deprecated alias, or compatibility adapter. An
+incompatible local settings file falls back to defaults and is replaced by
+the next automatic save.
+
+### Extending SensorHUD
+
+Metric metadata is declarative and centralized in
+`SensorHUD.Core/Metrics/MetricRegistry.cs`. A provider publishes only a base
+metric ID, optional device identity and name, numeric value, and error.
+Per-device preferences use the centralized `<metricId>@<deviceId>` key format.
+
+To add a metric:
+
+1. Add one definition to `MetricRegistry`.
+2. Publish one reading with that base ID from the appropriate collector
+   reader.
+
+Settings grouping and telemetry rendering then adapt automatically.
+
+To add a global setting:
+
+1. Add the model value, default, and validation rule under
+   `SensorHUD.Core/Settings`.
+2. Expose it through the focused layout or appearance view model.
+3. Add its compiled `x:Bind` control to `SettingsWidgetPage.xaml`.
+
+To add a new hardware source, implement `ITelemetryProvider` and register it
+in `TelemetrySampler.CreateDefault`. Provider failures are isolated so one
+source cannot suppress independent readings.
 
 ## Privacy
 
@@ -161,35 +197,6 @@ Read the complete [privacy policy](PRIVACY).
 
 Open `SensorHUD.slnx`, select the `x64` platform, and build the
 solution.
-
-<details>
-<summary><strong>Creating a signed GitHub release</strong></summary>
-
-Run the certificate initialization once:
-
-```powershell
-.\Distribution\Initialize-SigningCertificate.ps1
-```
-
-Choose a strong password for the private PFX backup and keep the backup and
-password outside the repository. They are required to sign future updates
-with the same publisher identity.
-
-Build the release:
-
-```powershell
-.\Distribution\Build-Release.ps1
-```
-
-The script creates a signed release ZIP under `artifacts`, includes the
-required x64 Visual C++ dependency, and prints the archive's SHA-256 value.
-Publish that value with the GitHub release.
-
-The private key remains in the current user's Windows certificate store. Only
-the public certificate is included in the release. Never commit or publish the
-PFX backup.
-
-</details>
 
 ## Security
 

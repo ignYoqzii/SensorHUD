@@ -1,9 +1,12 @@
 using System;
 using Microsoft.Gaming.XboxGameBar;
+using SensorHUD.Infrastructure;
 using Windows.ApplicationModel.Activation;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
+using SensorHUD.Widgets.Settings;
+using SensorHUD.Widgets.Telemetry;
 
 namespace SensorHUD;
 
@@ -13,10 +16,6 @@ namespace SensorHUD;
 /// </summary>
 public sealed partial class App : Application
 {
-    // These values must match the AppExtension IDs in Package.appxmanifest.
-    private const string TelemetryWidgetId = "SensorHUDWidget";
-    private const string SettingsWidgetId = "SensorHUDSettings";
-
     // The SDK requires the app to retain this object for the entire CoreWindow
     // lifetime. Releasing it early disconnects the widget from Game Bar.
     private XboxGameBarWidget? _activeWidget;
@@ -46,12 +45,12 @@ public sealed partial class App : Application
 
         switch (widgetArgs.AppExtensionId)
         {
-            case TelemetryWidgetId:
-                frame.Navigate(typeof(TelemetryPage), _activeWidget);
+            case FrontendConstants.TelemetryWidgetId:
+                frame.Navigate(typeof(TelemetryWidgetPage), _activeWidget);
                 break;
 
-            case SettingsWidgetId:
-                frame.Navigate(typeof(SettingsPage), _activeWidget);
+            case FrontendConstants.SettingsWidgetId:
+                frame.Navigate(typeof(SettingsWidgetPage), _activeWidget);
                 break;
 
             default:

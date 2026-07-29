@@ -40,7 +40,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Shared\SensorHUD.Shared.csproj" />
+    <ProjectReference Include="..\SensorHUD.Core\SensorHUD.Core.csproj" />
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.2.5" />
     <!-- Official signed PawnIO 2.2.0 installer, redistributed unmodified. -->
@@ -49,13 +49,4 @@
              CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- Keep the partial hardware-provider implementation grouped in the IDE. -->
-    <Compile Update="Sampling\Providers\HardwareSensorProvider.Sensors.cs">
-      <DependentUpon>HardwareSensorProvider.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Sampling\Providers\HardwareSensorProvider.Errors.cs">
-      <DependentUpon>HardwareSensorProvider.cs</DependentUpon>
-    </Compile>
-  </ItemGroup>
 </Project>

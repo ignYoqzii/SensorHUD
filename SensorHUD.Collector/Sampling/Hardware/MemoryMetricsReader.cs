@@ -1,0 +1,52 @@
+using SensorHUD.Collector.Transport;
+using SensorHUD.Core.Metrics;
+using SensorHUD.Core.Telemetry;
+
+namespace SensorHUD.Collector.Sampling.Hardware;
+
+/// <summary>
+/// Reads physical memory totals from Windows, which is more consistent than
+/// an optional LibreHardwareMonitor memory device.
+/// </summary>
+internal static class MemoryMetricsReader
+{
+    private const double BytesPerGigabyte = 1024d * 1024d * 1024d;
+    private const string DeviceName = "System Memory";
+
+    public static void Read(
+        ICollection<MetricReading> readings,
+        string? hardwareAccessError)
+    {
+        NativeMethods.MemoryStatus memory = new();
+        if (!NativeMethods.GlobalMemoryStatusEx(memory) ||
+            memory.TotalPhys == 0)
+        {
+            const string error =
+                "Failed to query Windows system memory status.";
+            AddUnavailable(MetricRegistry.MemoryUsage);
+            AddUnavailable(MetricRegistry.MemoryUsed);
+            AddUnavailable(MetricRegistry.MemoryTotal);
+            return;
+
+            void AddUnavailable(string metricId) =>
+                readings.Add(HardwareReading.Unavailable(
+                    metricId,
+                    DeviceName,
+                    error,
+                    hardwareAccessError));
+        }
+
+        readings.Add(HardwareReading.Value(
+            MetricRegistry.MemoryUsage,
+            memory.MemoryLoad,
+            DeviceName));
+        readings.Add(HardwareReading.Value(
+            MetricRegistry.MemoryUsed,
+            (memory.TotalPhys - memory.AvailPhys) / BytesPerGigabyte,
+            DeviceName));
+        readings.Add(HardwareReading.Value(
+            MetricRegistry.MemoryTotal,
+            memory.TotalPhys / BytesPerGigabyte,
+            DeviceName));
+    }
+}

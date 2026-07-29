@@ -8,7 +8,7 @@
     <SupportedOSPlatformVersion>10.0.18362.0</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
     <UseUwp>true</UseUwp>
-    <!-- Version 0.0.1 is distributed for 64-bit Intel/AMD Windows PCs. -->
+    <!-- GitHub sideload releases currently target 64-bit Intel/AMD PCs. -->
     <Platforms>x64</Platforms>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <DefaultLanguage>en-US</DefaultLanguage>
@@ -66,7 +66,9 @@
       Source-linking preserves one source of truth while avoiding a UWP
       project-reference issue that skips generated XAML partial classes.
     -->
-    <Compile Include="..\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+    <Compile Include="..\SensorHUD.Core\**\*.cs"
+             Exclude="..\SensorHUD.Core\bin\**;..\SensorHUD.Core\obj\**"
+             Link="Core\%(RecursiveDir)%(Filename)%(Extension)" />
     <!-- PawnIO's GPL text and exact corresponding source accompany its
          unmodified signed installer in every sideload package. -->
     <Content Include="..\Dependencies\PawnIO\COPYING">

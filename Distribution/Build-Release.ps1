@@ -123,11 +123,13 @@ $packageWorkDirectory = Join-Path $artifactsRoot 'package-work'
 $releaseDirectory = Join-Path `
     $artifactsRoot "SensorHUD-$releaseVersion-x64"
 $archivePath = "$releaseDirectory.zip"
+$checksumPath = "$archivePath.sha256"
 
 foreach ($path in @(
         $packageWorkDirectory,
         $releaseDirectory,
-        $archivePath)) {
+        $archivePath,
+        $checksumPath)) {
     if (Test-Path -LiteralPath $path) {
         Remove-Item -LiteralPath $path -Recurse -Force
     }
@@ -222,7 +224,15 @@ Compress-Archive `
     -DestinationPath $archivePath `
     -CompressionLevel Optimal
 
+$archiveHash = (Get-FileHash $archivePath -Algorithm SHA256).Hash
+$checksumLine = "$archiveHash *$(Split-Path -Leaf $archivePath)"
+Set-Content `
+    -LiteralPath $checksumPath `
+    -Value $checksumLine `
+    -Encoding ascii
+
 Write-Host ''
 Write-Host "Release archive: $archivePath"
+Write-Host "Checksum file: $checksumPath"
 Write-Host "Certificate: $($certificate.Thumbprint)"
-Write-Host "SHA-256: $((Get-FileHash $archivePath -Algorithm SHA256).Hash)"
+Write-Host "SHA-256: $archiveHash"
