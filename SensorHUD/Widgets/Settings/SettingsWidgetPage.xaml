@@ -134,6 +134,7 @@
                                        Style="{StaticResource SectionDescriptionStyle}" />
                         </StackPanel>
                         <ComboBox Header="Layout"
+                                  CornerRadius="4"
                                   HorizontalAlignment="Stretch"
                                   ItemsSource="{x:Bind ViewModel.Layout.Options, Mode=OneWay}"
                                   SelectedItem="{x:Bind ViewModel.Layout.Layout, Mode=TwoWay}" />
