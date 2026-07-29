@@ -5,7 +5,8 @@
     xmlns:viewModels="using:SensorHUD.Widgets.Settings">
 
     <Grid>
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <ScrollViewer x:Name="SettingsScrollViewer"
+                      VerticalScrollBarVisibility="Auto">
             <StackPanel MaxWidth="760"
                         Padding="{StaticResource SettingsPagePadding}"
                         Spacing="16"
@@ -134,12 +135,11 @@
                                        Style="{StaticResource SectionDescriptionStyle}" />
                         </StackPanel>
                         <ComboBox Header="Layout"
-                                  CornerRadius="4"
-                                  HorizontalAlignment="Stretch"
+                                  Style="{StaticResource SettingsComboBoxStyle}"
                                   ItemsSource="{x:Bind ViewModel.Layout.Options, Mode=OneWay}"
                                   SelectedItem="{x:Bind ViewModel.Layout.Layout, Mode=TwoWay}" />
                         <TextBox Header="Horizontal separator"
-                                 CornerRadius="4"
+                                 Style="{StaticResource SettingsTextBoxStyle}"
                                  Description="Spacing is added automatically. Leave empty for a single space."
                                  Text="{x:Bind ViewModel.Layout.HorizontalSeparator, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         <Grid ColumnSpacing="12">
@@ -147,11 +147,11 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="52" />
                             </Grid.ColumnDefinitions>
-                            <Slider Minimum="{x:Bind ViewModel.Appearance.MinimumBackgroundOpacityPercent, Mode=OneTime}"
+                            <Slider Style="{StaticResource SettingsSliderStyle}"
+                                    Minimum="{x:Bind ViewModel.Appearance.MinimumBackgroundOpacityPercent, Mode=OneTime}"
                                     Maximum="{x:Bind ViewModel.Appearance.MaximumBackgroundOpacityPercent, Mode=OneTime}"
                                     Header="Background opacity"
                                     StepFrequency="1"
-                                    CornerRadius="4"
                                     Value="{x:Bind ViewModel.Appearance.BackgroundOpacityPercent, Mode=TwoWay}" />
                             <TextBlock Grid.Column="1"
                                        Text="{x:Bind ViewModel.Appearance.BackgroundOpacityText, Mode=OneWay}"
@@ -160,13 +160,12 @@
                                        FontWeight="SemiBold" />
                         </Grid>
                         <TextBox Header="Font family"
-                                 CornerRadius="4"
+                                 Style="{StaticResource SettingsTextBoxStyle}"
                                  PlaceholderText="Segoe UI"
                                  Text="{x:Bind ViewModel.Appearance.FontFamily, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         <StackPanel Spacing="4">
                             <ComboBox Header="Font weight"
-                                      HorizontalAlignment="Stretch"
-                                      CornerRadius="4"
+                                      Style="{StaticResource SettingsComboBoxStyle}"
                                       ItemsSource="{x:Bind ViewModel.Appearance.FontWeightOptions, Mode=OneWay}"
                                       SelectedItem="{x:Bind ViewModel.Appearance.FontWeight, Mode=TwoWay}" />
                         </StackPanel>
@@ -175,11 +174,11 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="52" />
                             </Grid.ColumnDefinitions>
-                            <Slider Minimum="{x:Bind ViewModel.Appearance.MinimumFontSize, Mode=OneTime}"
+                            <Slider Style="{StaticResource SettingsSliderStyle}"
+                                    Minimum="{x:Bind ViewModel.Appearance.MinimumFontSize, Mode=OneTime}"
                                     Maximum="{x:Bind ViewModel.Appearance.MaximumFontSize, Mode=OneTime}"
                                     Header="Font size"
                                     StepFrequency="1"
-                                    CornerRadius="4"
                                     Value="{x:Bind ViewModel.Appearance.FontSize, Mode=TwoWay}" />
                             <TextBlock Grid.Column="1"
                                        Text="{x:Bind ViewModel.Appearance.FontSizeText, Mode=OneWay}"
@@ -201,6 +200,7 @@
                                     Style="{StaticResource ControlDescriptionStyle}" />
                             </StackPanel>
                             <Button Grid.Column="1"
+                                    Style="{StaticResource SettingsActionButtonStyle}"
                                     Padding="10,7"
                                     CornerRadius="6"
                                     VerticalAlignment="Center">
@@ -221,7 +221,7 @@
                                         Placement="Bottom"
                                         FlyoutPresenterStyle="{StaticResource ColorPickerFlyoutPresenterStyle}">
                                         <ColorPicker
-                                            CornerRadius="4"
+                                            Style="{StaticResource SettingsColorPickerStyle}"
                                             MinWidth="280"
                                             MaxWidth="320"
                                             Color="{x:Bind ViewModel.Appearance.FontColor, Mode=TwoWay}"
@@ -242,64 +242,50 @@
                     <TextBlock Text="Metrics"
                                FontSize="23"
                                FontWeight="SemiBold" />
-                    <TextBlock Text="Customize visibility, decimals, and formats. Available tokens: {value}, {unit}, {name}, and {device}."
+                    <TextBlock Text="Open a category to customize its metrics. Available tokens: {value}, {unit}, {name}, and {device}."
                                Style="{StaticResource SectionDescriptionStyle}" />
                 </StackPanel>
                 <ItemsControl ItemsSource="{x:Bind ViewModel.MetricCategories, Mode=OneTime}">
+                    <ItemsControl.ItemContainerTransitions>
+                        <TransitionCollection>
+                            <EntranceThemeTransition IsStaggeringEnabled="True"
+                                                     FromVerticalOffset="12" />
+                            <RepositionThemeTransition />
+                        </TransitionCollection>
+                    </ItemsControl.ItemContainerTransitions>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="viewModels:MetricCategoryViewModel">
                             <Border Margin="0,0,0,14"
                                     Style="{StaticResource SectionCardStyle}">
-                                <StackPanel Spacing="12">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Spacing="3">
-                                            <TextBlock Text="{x:Bind Name}"
-                                                       Style="{StaticResource SectionTitleStyle}" />
-                                            <TextBlock Text="{x:Bind Description}"
-                                                       Visibility="{x:Bind DescriptionVisibility}"
-                                                       Style="{StaticResource SectionDescriptionStyle}" />
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="3"
+                                                VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind Name}"
+                                                   Style="{StaticResource SectionTitleStyle}" />
+                                        <TextBlock Text="{x:Bind Description}"
+                                                   Visibility="{x:Bind DescriptionVisibility}"
+                                                   Style="{StaticResource SectionDescriptionStyle}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Style="{StaticResource SettingsActionButtonStyle}"
+                                            Padding="12,8"
+                                            CornerRadius="6"
+                                            VerticalAlignment="Center"
+                                            AutomationProperties.Name="{x:Bind Name}"
+                                            AutomationProperties.HelpText="Open metric settings"
+                                            Click="MetricCategoryButton_Click">
+                                        <StackPanel Orientation="Horizontal"
+                                                    Spacing="8">
+                                            <TextBlock Text="{x:Bind MetricCountText}" />
+                                            <FontIcon Glyph="&#xE72A;"
+                                                      FontSize="12" />
                                         </StackPanel>
-                                        <TextBlock Grid.Column="1"
-                                                   Text="{x:Bind MetricCountText}"
-                                                   FontSize="12"
-                                                   Opacity="0.58"
-                                                   VerticalAlignment="Center" />
-                                    </Grid>
-                                    <ItemsControl ItemsSource="{x:Bind Metrics}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="viewModels:MetricSettingsViewModel">
-                                                <Border Margin="0,0,0,8"
-                                                        Style="{StaticResource MetricEditorCardStyle}">
-                                                    <StackPanel Spacing="8">
-                                                        <ToggleSwitch Header="{x:Bind Name}"
-                                                                      IsOn="{x:Bind IsVisible, Mode=TwoWay}"
-                                                                      OnContent="On"
-                                                                      OffContent="Off" />
-                                                        <TextBox Header="Format"
-                                                                 CornerRadius="4"
-                                                                 Text="{x:Bind Format, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                 Description="{x:Bind UnitDescription}" />
-                                                        <ComboBox Header="Decimals"
-                                                                  CornerRadius="4"
-                                                                  ItemsSource="{x:Bind DecimalOptions}"
-                                                                  SelectedItem="{x:Bind SelectedDecimals, Mode=TwoWay}"
-                                                                  HorizontalAlignment="Stretch">
-                                                            <ComboBox.ItemTemplate>
-                                                                <DataTemplate x:DataType="viewModels:DecimalOption">
-                                                                    <TextBlock Text="{x:Bind Label}" />
-                                                                </DataTemplate>
-                                                            </ComboBox.ItemTemplate>
-                                                        </ComboBox>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
+                                    </Button>
+                                </Grid>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -319,8 +305,8 @@
                                        Style="{StaticResource SectionDescriptionStyle}" />
                         </StackPanel>
                         <Button Grid.Column="1"
+                                Style="{StaticResource SettingsActionButtonStyle}"
                                 Content="Reset"
-                                CornerRadius="4"
                                 Click="ResetButton_Click"
                                 VerticalAlignment="Center" />
                     </Grid>
@@ -341,5 +327,11 @@
                 </Border>
             </StackPanel>
         </ScrollViewer>
+
+        <viewModels:MetricEditorPanel
+            x:Name="MetricEditor"
+            Canvas.ZIndex="10"
+            Opened="MetricEditor_Opened"
+            Closed="MetricEditor_Closed" />
     </Grid>
 </Page>

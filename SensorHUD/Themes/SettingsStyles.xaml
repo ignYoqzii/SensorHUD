@@ -17,6 +17,20 @@
                              Color="#FF32363D" />
             <SolidColorBrush x:Key="MetricCardBorderBrush"
                              Color="#FF3E434C" />
+            <SolidColorBrush x:Key="SettingsControlBackgroundBrush"
+                             Color="#FF202329" />
+            <SolidColorBrush x:Key="SettingsControlBorderBrush"
+                             Color="#FF4A505A" />
+            <SolidColorBrush x:Key="SettingsActionBackgroundBrush"
+                             Color="#FF363A42" />
+            <SolidColorBrush x:Key="SettingsActionPointerOverBrush"
+                             Color="#FF41464F" />
+            <SolidColorBrush x:Key="SettingsActionPressedBrush"
+                             Color="#FF2D3036" />
+            <SolidColorBrush x:Key="SettingsAccentBrush"
+                             Color="#FF6FC8FF" />
+            <SolidColorBrush x:Key="SettingsAccentSubtleBrush"
+                             Color="#286FC8FF" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
             <SolidColorBrush x:Key="SettingsCardBackgroundBrush"
@@ -27,6 +41,20 @@
                              Color="#FFFFFFFF" />
             <SolidColorBrush x:Key="MetricCardBorderBrush"
                              Color="#FFE0E3E8" />
+            <SolidColorBrush x:Key="SettingsControlBackgroundBrush"
+                             Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="SettingsControlBorderBrush"
+                             Color="#FFC7CCD5" />
+            <SolidColorBrush x:Key="SettingsActionBackgroundBrush"
+                             Color="#FFE8EAF0" />
+            <SolidColorBrush x:Key="SettingsActionPointerOverBrush"
+                             Color="#FFF1F2F5" />
+            <SolidColorBrush x:Key="SettingsActionPressedBrush"
+                             Color="#FFDDE0E6" />
+            <SolidColorBrush x:Key="SettingsAccentBrush"
+                             Color="#FF3569E8" />
+            <SolidColorBrush x:Key="SettingsAccentSubtleBrush"
+                             Color="#183569E8" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
@@ -47,16 +75,134 @@
     </Style>
     <Style x:Key="MetricEditorCardStyle" TargetType="Border">
         <Setter Property="Padding" Value="14" />
-        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="CornerRadius" Value="10" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="BorderBrush"
                 Value="{ThemeResource MetricCardBorderBrush}" />
         <Setter Property="Background"
                 Value="{ThemeResource MetricCardBackgroundBrush}" />
     </Style>
+    <Style x:Key="SettingsActionButtonStyle" TargetType="Button">
+        <Setter Property="Background"
+                Value="{ThemeResource SettingsActionBackgroundBrush}" />
+        <Setter Property="BackgroundSizing" Value="OuterBorderEdge" />
+        <Setter Property="BorderBrush"
+                Value="{ThemeResource SettingsControlBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="MinHeight" Value="34" />
+        <Setter Property="Padding" Value="12,7" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <ContentPresenter
+                        x:Name="Presenter"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        Content="{TemplateBinding Content}"
+                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        Padding="{TemplateBinding Padding}"
+                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                        AutomationProperties.AccessibilityView="Raw">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal">
+                                    <Storyboard>
+                                        <PointerUpThemeAnimation
+                                            Storyboard.TargetName="Presenter" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="PointerOver">
+                                    <Storyboard>
+                                        <ObjectAnimationUsingKeyFrames
+                                            Storyboard.TargetName="Presenter"
+                                            Storyboard.TargetProperty="Background">
+                                            <DiscreteObjectKeyFrame
+                                                KeyTime="0"
+                                                Value="{ThemeResource SettingsActionPointerOverBrush}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                        <PointerUpThemeAnimation
+                                            Storyboard.TargetName="Presenter" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <Storyboard>
+                                        <ObjectAnimationUsingKeyFrames
+                                            Storyboard.TargetName="Presenter"
+                                            Storyboard.TargetProperty="Background">
+                                            <DiscreteObjectKeyFrame
+                                                KeyTime="0"
+                                                Value="{ThemeResource SettingsActionPressedBrush}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                        <PointerDownThemeAnimation
+                                            Storyboard.TargetName="Presenter" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <Storyboard>
+                                        <DoubleAnimation
+                                            Storyboard.TargetName="Presenter"
+                                            Storyboard.TargetProperty="Opacity"
+                                            To="0.45"
+                                            Duration="0" />
+                                    </Storyboard>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                    </ContentPresenter>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style x:Key="SettingsTextBoxStyle" TargetType="TextBox">
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Background"
+                Value="{ThemeResource SettingsControlBackgroundBrush}" />
+        <Setter Property="BorderBrush"
+                Value="{ThemeResource SettingsControlBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="10,6" />
+        <Setter Property="SelectionHighlightColor"
+                Value="{ThemeResource SettingsAccentBrush}" />
+    </Style>
+    <Style x:Key="SettingsComboBoxStyle" TargetType="ComboBox">
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Background"
+                Value="{ThemeResource SettingsControlBackgroundBrush}" />
+        <Setter Property="BorderBrush"
+                Value="{ThemeResource SettingsControlBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="10,5" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style x:Key="SettingsSliderStyle" TargetType="Slider">
+        <Setter Property="MinHeight" Value="38" />
+        <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <Style x:Key="SettingsToggleStyle" TargetType="ToggleSwitch">
+        <Setter Property="MinHeight" Value="34" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style x:Key="SettingsColorPickerStyle" TargetType="ColorPicker">
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Background"
+                Value="{ThemeResource SettingsCardBackgroundBrush}" />
+    </Style>
     <Style x:Key="ColorPickerFlyoutPresenterStyle"
            TargetType="FlyoutPresenter">
         <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Background"
+                Value="{ThemeResource SettingsCardBackgroundBrush}" />
+        <Setter Property="BorderBrush"
+                Value="{ThemeResource SettingsCardBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="20" />

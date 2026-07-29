@@ -1,0 +1,189 @@
+<UserControl
+    x:Class="SensorHUD.Widgets.Settings.MetricEditorPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:viewModels="using:SensorHUD.Widgets.Settings"
+    Visibility="Collapsed">
+
+    <UserControl.Resources>
+        <Storyboard x:Name="OpenStoryboard">
+            <DoubleAnimation Storyboard.TargetName="Overlay"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0"
+                             To="1"
+                             Duration="0:0:0.16">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="PanelTransform"
+                             Storyboard.TargetProperty="TranslateY"
+                             From="14"
+                             To="0"
+                             Duration="0:0:0.20">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="PanelTransform"
+                             Storyboard.TargetProperty="ScaleX"
+                             From="0.985"
+                             To="1"
+                             Duration="0:0:0.20">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="PanelTransform"
+                             Storyboard.TargetProperty="ScaleY"
+                             From="0.985"
+                             To="1"
+                             Duration="0:0:0.20">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+        <Storyboard x:Name="CloseStoryboard"
+                    Completed="CloseStoryboard_Completed">
+            <DoubleAnimation Storyboard.TargetName="Overlay"
+                             Storyboard.TargetProperty="Opacity"
+                             From="1"
+                             To="0"
+                             Duration="0:0:0.12">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseIn" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="PanelTransform"
+                             Storyboard.TargetProperty="TranslateY"
+                             From="0"
+                             To="8"
+                             Duration="0:0:0.12">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseIn" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="PanelTransform"
+                             Storyboard.TargetProperty="ScaleX"
+                             From="1"
+                             To="0.99"
+                             Duration="0:0:0.12" />
+            <DoubleAnimation Storyboard.TargetName="PanelTransform"
+                             Storyboard.TargetProperty="ScaleY"
+                             From="1"
+                             To="0.99"
+                             Duration="0:0:0.12" />
+        </Storyboard>
+    </UserControl.Resources>
+
+    <!--
+        Xbox Game Bar's hosted XAML surface does not reliably support complex
+        UWP flyouts. This in-widget layer provides the same compact editing
+        workflow without creating another popup or window.
+    -->
+    <Grid x:Name="Overlay"
+          Background="#99000000"
+          KeyDown="Overlay_KeyDown">
+        <Border Margin="16"
+                MaxWidth="520"
+                Padding="0"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                RenderTransformOrigin="0.5,0.5"
+                Style="{StaticResource SectionCardStyle}">
+            <Border.RenderTransform>
+                <CompositeTransform x:Name="PanelTransform" />
+            </Border.RenderTransform>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid Margin="18,18,18,0"
+                      ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border Width="36"
+                            Height="36"
+                            CornerRadius="8"
+                            Background="{ThemeResource SettingsAccentSubtleBrush}"
+                            VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE9D9;"
+                                  FontSize="16"
+                                  Foreground="{ThemeResource SettingsAccentBrush}" />
+                    </Border>
+                    <StackPanel Grid.Column="1"
+                                Spacing="3"
+                                VerticalAlignment="Center">
+                        <TextBlock x:Name="TitleText"
+                                   Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock x:Name="DescriptionText"
+                                   Style="{StaticResource SectionDescriptionStyle}" />
+                    </StackPanel>
+                    <Button x:Name="CloseButton"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsActionButtonStyle}"
+                            Width="36"
+                            Height="36"
+                            Padding="0"
+                            CornerRadius="6"
+                            VerticalAlignment="Top"
+                            Click="CloseButton_Click"
+                            AutomationProperties.Name="Close metric settings">
+                        <FontIcon Glyph="&#xE711;"
+                                  FontSize="13" />
+                    </Button>
+                </Grid>
+                <ScrollViewer Grid.Row="1"
+                              Margin="0,14,0,0"
+                              VerticalScrollMode="Auto"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollMode="Disabled"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl x:Name="MetricItems"
+                                  Margin="18,0,18,18">
+                        <ItemsControl.ItemContainerTransitions>
+                            <TransitionCollection>
+                                <EntranceThemeTransition
+                                    IsStaggeringEnabled="True"
+                                    FromVerticalOffset="10" />
+                            </TransitionCollection>
+                        </ItemsControl.ItemContainerTransitions>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="viewModels:MetricSettingsViewModel">
+                                <Border Margin="0,0,0,10"
+                                        Style="{StaticResource MetricEditorCardStyle}">
+                                    <StackPanel Spacing="8">
+                                        <ToggleSwitch Header="{x:Bind Name}"
+                                                      Style="{StaticResource SettingsToggleStyle}"
+                                                      IsOn="{x:Bind IsVisible, Mode=TwoWay}"
+                                                      OnContent="On"
+                                                      OffContent="Off" />
+                                        <TextBox Header="Format"
+                                                 Style="{StaticResource SettingsTextBoxStyle}"
+                                                 Text="{x:Bind Format, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 Description="{x:Bind UnitDescription}" />
+                                        <ComboBox Header="Decimals"
+                                                  Style="{StaticResource SettingsComboBoxStyle}"
+                                                  ItemsSource="{x:Bind DecimalOptions}"
+                                                  SelectedItem="{x:Bind SelectedDecimals, Mode=TwoWay}">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate x:DataType="viewModels:DecimalOption">
+                                                    <TextBlock Text="{x:Bind Label}" />
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

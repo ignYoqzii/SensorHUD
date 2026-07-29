@@ -145,6 +145,10 @@ Settings are saved automatically. You can:
 - Set a format and decimal places independently for every metric.
 - Configure each detected GPU independently.
 
+Select the metric-count button on a category to open its metric editors in a
+focused, scrollable panel. This keeps the settings page compact as more
+categories and metrics are added.
+
 Use **Reset settings** at the bottom of the settings widget to restore current
 defaults.
 

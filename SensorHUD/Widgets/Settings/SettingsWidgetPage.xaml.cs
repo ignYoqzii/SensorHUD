@@ -99,10 +99,38 @@ public sealed partial class SettingsWidgetPage : Page
         RefreshStatus();
     }
 
+    private void MetricCategoryButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (sender is not Control target ||
+            target.DataContext is not MetricCategoryViewModel category)
+        {
+            return;
+        }
+
+        MetricEditor.Open(category, target);
+    }
+
+    private void MetricEditor_Opened(object sender, EventArgs e)
+    {
+        SettingsScrollViewer.IsEnabled = false;
+        SettingsScrollViewer.VerticalScrollBarVisibility =
+            ScrollBarVisibility.Hidden;
+    }
+
+    private void MetricEditor_Closed(object sender, EventArgs e)
+    {
+        SettingsScrollViewer.IsEnabled = true;
+        SettingsScrollViewer.VerticalScrollBarVisibility =
+            ScrollBarVisibility.Auto;
+    }
+
     private void ReplaceViewModel(
         WidgetSettings settings,
         TelemetrySnapshot? snapshot)
     {
+        MetricEditor.CloseImmediately();
         ViewModel.Changed -= ViewModel_Changed;
         ViewModel = new SettingsPageViewModel(settings, snapshot);
         _deviceSignature = CreateDeviceSignature(snapshot);
@@ -130,6 +158,7 @@ public sealed partial class SettingsWidgetPage : Page
         RoutedEventArgs e)
     {
         _isUnloaded = true;
+        MetricEditor.CloseImmediately();
         _collector.SnapshotReceived -= Collector_SnapshotReceived;
         _collector.StatusChanged -= Collector_StatusChanged;
         ViewModel.Changed -= ViewModel_Changed;

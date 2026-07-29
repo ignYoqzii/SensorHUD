@@ -4,7 +4,8 @@ using Windows.UI.Xaml;
 namespace SensorHUD.Widgets.Settings;
 
 /// <summary>
-/// One category settings card containing global or device-specific metrics.
+/// One compact category entry whose global or device-specific metric editors
+/// are presented together in the shared metric editor.
 /// </summary>
 public sealed class MetricCategoryViewModel
 {
@@ -40,7 +41,7 @@ public sealed class MetricCategoryViewModel
     public Visibility DescriptionVisibility { get; }
 
     /// <summary>
-    /// Gets the user-facing metric-count summary for the card.
+    /// Gets the user-facing metric-count label for the editor button.
     /// </summary>
     public string MetricCountText { get; }
 

@@ -2,8 +2,9 @@
 
 [← Back to the README](../README.md)
 
-SensorHUD generates its metric settings and overlay presentation from shared
-metadata. In most cases, adding telemetry requires only two changes:
+SensorHUD generates its compact category entries, metric-editor panels, and
+overlay presentation from shared metadata. In most cases, adding telemetry
+requires only two changes:
 
 1. Describe the metric in
    [`MetricRegistry`](../SensorHUD.Core/Metrics/MetricRegistry.cs).
@@ -214,7 +215,8 @@ new()
 
 Add one or more metric definitions assigned to `MetricCategory.Storage`, then
 publish their readings. SensorHUD generates the category heading,
-description, settings cards, ordering, and overlay output automatically.
+description, settings entries, metric panels, ordering, and overlay output
+automatically.
 
 ## Choose category behavior
 
@@ -267,7 +269,11 @@ remain independent of it.
 1. Add the model property, default, and validation rule under
    `SensorHUD.Core/Settings`.
 2. Expose it through the focused layout or appearance view model.
-3. Add its compiled `x:Bind` control to `SettingsWidgetPage.xaml`.
+3. Add its compiled `x:Bind` control to
+   [`SettingsWidgetPage.xaml`](../SensorHUD/Widgets/Settings/SettingsWidgetPage.xaml).
+4. Apply the relevant shared `Settings*Style` from
+   [`SettingsStyles.xaml`](../SensorHUD/Themes/SettingsStyles.xaml) instead of
+   creating one-off visual values.
 
 Metric-specific settings should remain registry-driven instead of becoming
 global properties or category-specific XAML.
