@@ -81,7 +81,10 @@ public sealed partial class App : Application
             return null;
         }
 
-        return args as XboxGameBarWidgetActivatedEventArgs;
+        // The Game Bar type comes from a generated C#/WinRT projection.
+        // Its COM runtime class must be queried through the projection-aware
+        // cast; the CLR "as" operator returns null in Native AOT releases.
+        return WinRT.CastExtensions.As<XboxGameBarWidgetActivatedEventArgs>(args);
     }
 
     private void CurrentWindow_Closed(object sender, Windows.UI.Core.CoreWindowEventArgs e)
