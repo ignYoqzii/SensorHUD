@@ -22,16 +22,20 @@
 
   <p>
     <a href="#installation">Installation</a>
-    ·
+    -
     <a href="#what-it-monitors">Metrics</a>
-    ·
+    -
     <a href="#how-it-works">Architecture</a>
-    ·
+    -
     <a href="#building-from-source">Build</a>
-    ·
+    -
     <a href="#privacy">Privacy</a>
   </p>
 </div>
+
+---
+
+*I might not be very active for development in the future.*
 
 ---
 
@@ -56,6 +60,7 @@ designed to be compact, responsive, and useful at a glance.
 - 64-bit Windows 10 build 18362 or later on an Intel or AMD processor
 - An up-to-date installation of Xbox Game Bar
 - An administrator account or access to administrator credentials
+- Developer mode enabled for sideloading
 
 ### Install
 
@@ -145,12 +150,6 @@ package-scoped named pipe whose client identity is verified before telemetry
 is exchanged. The pipe has a strict size-limited, length-prefixed protocol.
 Session identity exists only in the message envelope, while telemetry
 snapshots contain capture time, typed health, and readings.
-
-The current protocol starts at version 1. The project was unpublished when
-this architecture was introduced, so there is no earlier protocol fallback,
-settings migration, deprecated alias, or compatibility adapter. An
-incompatible local settings file falls back to defaults and is replaced by
-the next automatic save.
 
 ### Extending SensorHUD
 
