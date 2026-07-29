@@ -131,15 +131,23 @@ public sealed partial class TelemetryWidgetPage : Page
             gameBarOpacity /= FrontendConstants.PercentageScale;
         }
 
-        BackgroundPanel.Background = new SolidColorBrush(
-            RequestedTheme == ElementTheme.Light
-                ? LightBackground
-                : DarkBackground)
+        Color backgroundColor = RequestedTheme == ElementTheme.Light
+            ? LightBackground
+            : DarkBackground;
+        double opacity = Math.Clamp(
+            _settings.Appearance.BackgroundOpacity * gameBarOpacity,
+            SettingsDefaults.MinimumBackgroundOpacity,
+            SettingsDefaults.MaximumBackgroundOpacity);
+        if (BackgroundPanel.Background is SolidColorBrush brush)
         {
-            Opacity = Math.Clamp(
-                _settings.Appearance.BackgroundOpacity * gameBarOpacity,
-                SettingsDefaults.MinimumBackgroundOpacity,
-                SettingsDefaults.MaximumBackgroundOpacity),
+            brush.Color = backgroundColor;
+            brush.Opacity = opacity;
+            return;
+        }
+
+        BackgroundPanel.Background = new SolidColorBrush(backgroundColor)
+        {
+            Opacity = opacity,
         };
     }
 

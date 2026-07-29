@@ -8,6 +8,7 @@ namespace SensorHUD.Core.Transport;
 /// </summary>
 public enum CollectorMessageKind
 {
+    None = 0,
     ClientHello = 1,
     ServerHello = 2,
     Snapshot = 3,

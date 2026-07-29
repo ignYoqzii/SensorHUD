@@ -1,6 +1,7 @@
 using SensorHUD.Collector.Bootstrap;
 using SensorHUD.Collector.Sampling.Frames;
 using SensorHUD.Collector.Sampling.Hardware;
+using SensorHUD.Collector.Sampling.Network;
 using SensorHUD.Core.Telemetry;
 
 namespace SensorHUD.Collector.Sampling;
@@ -36,16 +37,18 @@ internal sealed class TelemetrySampler : IDisposable
         HardwareMetricsProvider hardware =
             new(pawnIo.Error);
         FrameMetricsProvider frames = new();
+        InternetConnectionMetricsProvider internetConnection = new();
         return new TelemetrySampler(
             pawnIo,
             frames,
             hardware,
-            frames);
+            frames,
+            internetConnection);
     }
 
     public TelemetrySnapshot Sample()
     {
-        List<MetricReading> readings = [];
+        List<MetricReading> readings = new(32);
         string? lastProviderError = null;
 
         foreach (ITelemetryProvider provider in _providers)
@@ -75,7 +78,7 @@ internal sealed class TelemetrySampler : IDisposable
                 PawnIoVersion = _pawnIo.Version,
                 PawnIoError = _pawnIo.Error,
                 FrameCaptureState = frameStatus.State,
-                FrameTargetProcess = frameStatus.TargetProcess,
+                ForegroundProcess = frameStatus.TargetProcess,
                 FrameCaptureError = frameStatus.Error,
                 LastProviderError = lastProviderError,
             },

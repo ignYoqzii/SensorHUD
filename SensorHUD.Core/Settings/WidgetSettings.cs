@@ -67,10 +67,13 @@ public sealed class MetricDisplaySettings
 {
     public bool IsVisible { get; set; }
 
-    public string Template { get; set; } = string.Empty;
+    /// <summary>
+    /// Gets or sets the chosen metric format.
+    /// </summary>
+    public string Format { get; set; } = string.Empty;
 
     /// <summary>
-    /// Null uses the metric definition's default precision.
+    /// Gets or sets the decimal count. Null uses the registry default.
     /// </summary>
-    public int? Precision { get; set; }
+    public int? Decimals { get; set; }
 }

@@ -47,7 +47,7 @@ designed to be compact, responsive, and useful at a glance.
 
 | Live telemetry | Flexible presentation | Local by design |
 | --- | --- | --- |
-| CPU, GPU, memory, network, frame rate, temperatures, load, and dedicated memory | Configurable metrics, templates, decimal precision, layout, colors, typography, and pinning | No account, advertising, analytics, cloud service, or remote telemetry |
+| CPU, GPU, memory, network, frame rate, temperatures, load, and dedicated memory | Configurable metrics, formats, decimals, layout, colors, typography, and pinning | No account, advertising, analytics, cloud service, or remote telemetry |
 
 > [!NOTE]
 > Available readings depend on the sensors exposed by the computer's hardware,
@@ -93,7 +93,8 @@ older than the required version.
 
 Download and extract the new release, then run its `Install.cmd`. Windows
 replaces the installed package while preserving the application's local
-settings.
+settings file. SensorHUD accepts only the current settings schema and resets
+invalid or incompatible files to defaults.
 
 ## Uninstallation
 
@@ -108,13 +109,24 @@ separately from **Windows Settings > Apps > Installed apps**.
 
 | Category | Available metrics |
 | --- | --- |
-| Processor | Total load and package temperature |
-| Graphics | Load, temperature, dedicated-memory usage, memory used, and memory total for every detected GPU |
+| CPU | Total load and package temperature |
+| GPU | Load, temperature, dedicated-memory usage, memory used, and memory total for every detected adapter |
 | Memory | Physical-memory usage, memory used, and memory total |
-| Network | Upload and download throughput |
-| Games | FPS, 1% Low, and average frametime when a compatible ETW source is available |
+| Network | Upload and download throughput, Internet ping, and packet loss |
+| Frame Rate | FPS, 1% Low, and average frametime for the selected presenting foreground process |
 
-Every individual metric can be enabled or hidden. Templates support
+Ping and packet loss measure general Internet-path stability rather than a
+specific game or foreground process. The collector asynchronously probes a
+selected public anycast endpoint once per sampling interval and keeps a
+bounded rolling window. Cloudflare
+[`1.1.1.1`](https://developers.cloudflare.com/1.1.1.1/ip-addresses/) and
+Google Public DNS
+[`8.8.8.8`](https://developers.google.com/speed/public-dns/docs/using) are
+used for initial selection and automatic failover; ordinary sampling probes
+only the selected endpoint. These readings can be unavailable when a network
+blocks ICMP even though other Internet traffic still works.
+
+Every individual metric can be enabled or hidden. Formats support
 `{value}`, `{unit}`, `{name}`, and `{device}`, and each metric can use its
 catalog default or zero, one, or two decimal places. The rendered value is
 slightly larger while the unit remains compact. The font-weight setting
@@ -133,10 +145,11 @@ flowchart LR
     G["Xbox Game Bar"] --> W["UWP widget"]
     W -->|"launches"| C["Elevated collector"]
     C -->|"secured named pipe"| W
-    C --> H["Hardware providers"]
-    H --> L["LibreHardwareMonitor"]
-    H --> P["PawnIO"]
-    H --> E["Windows ETW"]
+    C --> T["Telemetry providers"]
+    T --> L["LibreHardwareMonitor"]
+    T --> P["PawnIO"]
+    T --> E["DXG ETW"]
+    T --> I["Internet path probes"]
 ```
 
 | Project | Responsibility |
@@ -151,37 +164,254 @@ is exchanged. The pipe has a strict size-limited, length-prefixed protocol.
 Session identity exists only in the message envelope, while telemetry
 snapshots contain capture time, typed health, and readings.
 
+Recurring work is intentionally bounded: hardware uses one shared update
+pass, DXG ETW is filtered to presentation events, frame and Internet histories
+have fixed windows, the pipe keeps only the newest pending snapshot, and the
+widget updates existing XAML runs when its structure has not changed. Provider
+failures are isolated so one unavailable source does not suppress independent
+metrics.
+
+The settings file also uses only the current schema. There is no legacy
+migration layer; unknown properties or invalid values cause a clean fallback
+to current defaults.
+
 ### Extending SensorHUD
 
-Metric metadata is declarative and centralized in
-`SensorHUD.Core/Metrics/MetricRegistry.cs`. A provider publishes only a base
-metric ID, optional device identity and name, numeric value, and error.
-Per-device preferences use the centralized `<metricId>@<deviceId>` key format.
+Adding telemetry has two independent parts:
 
-To add a metric:
+1. Describe the category and metric in
+   `SensorHUD.Core/Metrics/MetricRegistry.cs`.
+2. Publish a `MetricReading` from a collector reader or provider.
 
-1. Add one definition to `MetricRegistry`.
-2. Publish one reading with that base ID from the appropriate collector
-   reader.
+That is all the settings UI needs. Category cards, category descriptions,
+metric names, format editors, decimal choices, device-specific editors,
+ordering, defaults, and overlay formatting are generated from the registry.
+Do not add category-specific settings XAML.
 
-Settings grouping and telemetry rendering then adapt automatically.
+#### Category metadata
 
-To add a global setting:
+Every category has one `MetricCategoryDefinition`:
+
+| Property | Purpose |
+| --- | --- |
+| `Id` | Strongly typed category identity used by metric definitions |
+| `Name` | Heading displayed in settings |
+| `Description` | Optional text displayed directly below the heading; use `null` to omit it |
+| `SortOrder` | Unique category position; lower values appear first |
+
+For example:
+
+```csharp
+new()
+{
+    Id = MetricCategory.Cpu,
+    Name = "CPU",
+    Description = "Processor utilization and temperature.",
+    SortOrder = 100,
+},
+```
+
+#### Metric metadata
+
+Every metric has one readable `MetricDefinition`:
+
+| Property | Required | Purpose |
+| --- | --- | --- |
+| `Id` | Yes | Stable provider and settings identity |
+| `Category` | Yes | Category containing the metric |
+| `Name` | Yes | Name in settings and value of `{name}` |
+| `Unit` | Yes | Value of `{unit}`; use an empty string for no unit |
+| `Format` | Yes | Default overlay format |
+| `Decimals` | Yes | Default number of decimal places |
+| `SortOrder` | Yes | Unique position inside the category |
+| `IsVisibleByDefault` | No | Defaults to `true` |
+| `IsPerDevice` | No | Defaults to `false`; enable it for one independent metric per device |
+
+Metric formats support four tokens:
+
+| Token | Replaced with |
+| --- | --- |
+| `{name}` | Metric `Name` |
+| `{value}` | Numeric reading using the selected decimals |
+| `{unit}` | Metric `Unit` |
+| `{device}` | Provider-supplied device name, or the category name as a fallback |
+
+The settings widget automatically provides **Default**, **0 decimals**,
+**1 decimal**, and **2 decimals** choices. The shared range is defined by
+`MinimumDecimals` and `MaximumDecimals` in `SettingsDefaults`.
+
+#### Add a global metric to an existing category
+
+First add a stable ID near the top of `MetricRegistry`, then add its
+definition to `OrderedDefinitions`:
+
+```csharp
+public const string CpuPower = "cpu.power";
+
+new()
+{
+    Id = CpuPower,
+    Category = MetricCategory.Cpu,
+    Name = "Power",
+    Unit = "W",
+    Format = "{device} Power: {value} {unit}",
+    Decimals = 1,
+    IsVisibleByDefault = false,
+    SortOrder = 2,
+},
+```
+
+Then publish the reading from the category's existing reader or provider:
+
+```csharp
+readings.Add(new MetricReading
+{
+    MetricId = MetricRegistry.CpuPower,
+    DeviceName = "CPU",
+    Value = watts,
+});
+```
+
+The CPU category and its new metric editor appear automatically. No settings
+view model or XAML change is required.
+
+#### Add a per-device metric to an existing category
+
+Use the same definition, but set `IsPerDevice = true`:
+
+```csharp
+public const string GpuFanSpeed = "gpu.fanSpeed";
+
+new()
+{
+    Id = GpuFanSpeed,
+    Category = MetricCategory.Gpu,
+    Name = "Fan Speed",
+    Unit = "RPM",
+    Format = "{device} Fan: {value} {unit}",
+    Decimals = 0,
+    SortOrder = 5,
+    IsPerDevice = true,
+},
+```
+
+Every published reading must include both device fields:
+
+```csharp
+readings.Add(new MetricReading
+{
+    MetricId = MetricRegistry.GpuFanSpeed,
+    DeviceId = stableDeviceId,
+    DeviceName = gpu.Name,
+    Value = fanRpm,
+});
+```
+
+`DeviceId` is the durable settings identity and must remain stable across
+samples and restarts. `DeviceName` is only the user-facing label. SensorHUD
+creates one `GPU - <device name>` category card and one saved preference per
+detected device. A per-device card appears after the collector has published
+at least one reading carrying that device ID. LibreHardwareMonitor readers
+should use `SensorLookup.StableDeviceId` rather than inventing another device
+identity scheme.
+
+#### Add a new category
+
+First add its enum member in
+`SensorHUD.Core/Metrics/MetricDefinition.cs`:
+
+```csharp
+public enum MetricCategory
+{
+    // Existing categories...
+    Storage,
+}
+```
+
+Then add its category metadata to `CategoryDefinitions` in `MetricRegistry`:
+
+```csharp
+new()
+{
+    Id = MetricCategory.Storage,
+    Name = "Storage",
+    Description = "Drive activity, capacity, and health.",
+    SortOrder = 500,
+},
+```
+
+Finally add one or more metric definitions assigned to
+`MetricCategory.Storage` and publish their readings. The new category is now
+complete; there are no label switches, order switches, settings view models,
+or XAML templates to update.
+
+#### Choose global, per-device, or mixed behavior
+
+Behavior is selected per metric, not per category:
+
+- **Global category:** leave `IsPerDevice` false on every metric. Settings
+  shows one category card.
+- **Per-device category:** set `IsPerDevice = true` on every metric. Settings
+  shows one category card per detected device.
+- **Mixed category:** combine global and per-device definitions in the same
+  category. Settings shows one global category card plus one card for each
+  detected device.
+
+For example, a Storage category could expose global `Total Activity` while
+also exposing per-device `Temperature`. No special mixed-category code is
+needed.
+
+| Storage metric | `IsPerDevice` | Generated settings card |
+| --- | --- | --- |
+| `Total Activity` | `false` | `Storage` |
+| `Temperature` | `true` | `Storage - <device name>` for every drive |
+
+Expected unavailable data should still be published with the metric ID,
+device identity when applicable, a null `Value`, and an explanatory `Error`.
+Provider exceptions are reserved for unexpected failures.
+
+#### Add a telemetry provider
+
+1. Create a focused `ITelemetryProvider` under
+   `SensorHUD.Collector/Sampling`.
+2. Keep `Sample` short and non-blocking. Long-running I/O should execute in
+   the background and expose the latest bounded result to `Sample`.
+3. Return unavailable readings for expected startup, permission, hardware, or
+   connectivity states. An unexpected exception is isolated and reported as
+   collector health without suppressing other providers.
+4. Implement `IDisposable` when the provider owns ETW sessions, timers,
+   hardware handles, or background resources.
+5. Construct and register the provider in
+   `TelemetrySampler.CreateDefault`.
+
+When a new reading comes from the existing LibreHardwareMonitor `Computer`,
+prefer a focused reader called by `HardwareMetricsProvider`. This preserves
+one hardware enumeration/update pass instead of opening another monitor.
+Readers remain the sole owners of their metrics, so do not duplicate fallback
+metric lists in the provider. Sources that do not require
+LibreHardwareMonitor, such as Windows physical-memory status, should remain
+independent of its startup state.
+
+Keep existing metric IDs and per-device IDs unchanged after release. They are
+durable settings identities. Category enum values are not persisted.
+
+#### Add a global setting
 
 1. Add the model value, default, and validation rule under
    `SensorHUD.Core/Settings`.
 2. Expose it through the focused layout or appearance view model.
 3. Add its compiled `x:Bind` control to `SettingsWidgetPage.xaml`.
 
-To add a new hardware source, implement `ITelemetryProvider` and register it
-in `TelemetrySampler.CreateDefault`. Provider failures are isolated so one
-source cannot suppress independent readings.
+After any extension, build the complete `Debug|x64` solution with Visual
+Studio MSBuild so XAML generation is validated, and build the collector in
+Release configuration to catch backend-specific warnings.
 
 ## Privacy
 
 Hardware readings, device names, and preferences remain on the local computer.
-The application has no server component and does not transmit information to
-the developer or any third party.
+The application has no server component and does not transmit collected
+telemetry to the developer or any third party. Its small Internet stability
+probes are described in the privacy policy.
 
 Read the complete [privacy policy](PRIVACY).
 
@@ -196,15 +426,6 @@ Read the complete [privacy policy](PRIVACY).
 
 Open `SensorHUD.slnx`, select the `x64` platform, and build the
 solution.
-
-## Security
-
-Download release archives only from this repository and compare their
-SHA-256 values with the corresponding release notes.
-
-Report vulnerabilities through GitHub private security advisories rather than
-a public issue. See the [security policy](SECURITY) for the information to
-include.
 
 ## Third-party software
 

@@ -7,7 +7,7 @@ using SensorHUD.Core.Telemetry;
 namespace SensorHUD.Core.Metrics;
 
 /// <summary>
-/// Identifies the semantic role of a formatted template segment.
+/// Identifies the semantic role of a metric-format segment.
 /// </summary>
 public enum MetricTextRole
 {
@@ -17,23 +17,26 @@ public enum MetricTextRole
 }
 
 /// <summary>
-/// One formatted segment of a metric template.
+/// One formatted segment of a metric format.
 /// </summary>
-public sealed record MetricTextPart(string Text, MetricTextRole Role);
+public readonly record struct MetricTextPart(
+    string Text,
+    MetricTextRole Role);
 
 /// <summary>
-/// Expands the small, documented metric-template language into typed text
+/// Expands the small, documented metric-format language into typed text
 /// parts so the frontend can style values and units independently.
 /// </summary>
 public static class MetricFormatter
 {
-    private static readonly TemplateToken[] Tokens =
+    private static readonly FormatToken[] Tokens =
     [
         new("{value}", MetricTextRole.Value),
         new("{unit}", MetricTextRole.Unit),
         new("{name}", MetricTextRole.Text),
         new("{device}", MetricTextRole.Text),
     ];
+    private static readonly string[] NumericFormats = ["F0", "F1", "F2"];
 
     /// <summary>
     /// Formats one reading while preserving semantic value and unit parts.
@@ -43,27 +46,31 @@ public static class MetricFormatter
         MetricReading? reading,
         MetricDisplaySettings? settings)
     {
-        string template = string.IsNullOrWhiteSpace(settings?.Template)
-            ? definition.DefaultTemplate
-            : settings.Template;
-        int precision = settings?.Precision ?? definition.DefaultPrecision;
+        ArgumentNullException.ThrowIfNull(definition);
+
+        string format = string.IsNullOrWhiteSpace(settings?.Format)
+            ? definition.Format
+            : settings.Format;
+        int decimals = settings?.Decimals ?? definition.Decimals;
         string numericValue = reading?.Value is double value
-            ? value.ToString($"F{precision}", CultureInfo.CurrentCulture)
+            ? value.ToString(
+                GetNumericFormat(decimals),
+                CultureInfo.CurrentCulture)
             : "N/A";
         string deviceName = string.IsNullOrWhiteSpace(reading?.DeviceName)
-            ? GetFallbackDeviceName(definition.Group)
+            ? GetFallbackDeviceName(definition.Category)
             : reading.DeviceName;
 
-        List<MetricTextPart> parts = [];
+        List<MetricTextPart> parts = new(4);
         int position = 0;
-        while (position < template.Length)
+        while (position < format.Length)
         {
-            TemplateToken? next = null;
-            int nextIndex = template.Length;
+            FormatToken? next = null;
+            int nextIndex = format.Length;
 
-            foreach (TemplateToken token in Tokens)
+            foreach (FormatToken token in Tokens)
             {
-                int index = template.IndexOf(
+                int index = format.IndexOf(
                     token.Text,
                     position,
                     StringComparison.Ordinal);
@@ -76,11 +83,11 @@ public static class MetricFormatter
 
             if (next is null)
             {
-                Add(parts, template[position..], MetricTextRole.Text);
+                Add(parts, format[position..], MetricTextRole.Text);
                 break;
             }
 
-            Add(parts, template[position..nextIndex], MetricTextRole.Text);
+            Add(parts, format[position..nextIndex], MetricTextRole.Text);
             Add(
                 parts,
                 Replace(next.Text, definition, numericValue, deviceName),
@@ -99,23 +106,22 @@ public static class MetricFormatter
         {
             "{value}" => value,
             "{unit}" => definition.Unit,
-            "{name}" => definition.Label,
+            "{name}" => definition.Name,
             "{device}" => deviceName,
             _ => token,
         };
 
-    private static string GetFallbackDeviceName(MetricGroup group) =>
-        group switch
-        {
-            MetricGroup.Cpu => "CPU",
-            MetricGroup.Gpu => "GPU",
-            MetricGroup.Memory => "Memory",
-            MetricGroup.Network => "Network",
-            _ => string.Empty,
-        };
+    private static string GetFallbackDeviceName(
+        MetricCategory category) =>
+        MetricRegistry.GetCategory(category).Name;
+
+    private static string GetNumericFormat(int decimals) =>
+        (uint)decimals < NumericFormats.Length
+            ? NumericFormats[decimals]
+            : $"F{decimals}";
 
     private static void Add(
-        ICollection<MetricTextPart> parts,
+        List<MetricTextPart> parts,
         string text,
         MetricTextRole role)
     {
@@ -125,5 +131,5 @@ public static class MetricFormatter
         }
     }
 
-    private sealed record TemplateToken(string Text, MetricTextRole Role);
+    private sealed record FormatToken(string Text, MetricTextRole Role);
 }

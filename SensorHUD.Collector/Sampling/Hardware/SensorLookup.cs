@@ -42,9 +42,15 @@ internal static class SensorLookup
             }
         }
 
-        return sensors.FirstOrDefault(sensor =>
-            sensor.SensorType == type &&
-            sensor.Value.HasValue)?.Value;
+        foreach (ISensor sensor in sensors)
+        {
+            if (sensor.SensorType == type && sensor.Value.HasValue)
+            {
+                return sensor.Value.Value;
+            }
+        }
+
+        return null;
     }
 
     public static string StableDeviceId(IHardware hardware) =>
@@ -54,7 +60,7 @@ internal static class SensorLookup
             {
                 byte[] hash = SHA256.HashData(
                     Encoding.UTF8.GetBytes(identifier));
-                return Convert.ToHexString(hash)[..10].ToLowerInvariant();
+                return Convert.ToHexString(hash)[..10];
             });
 
     private static void AddRecursive(

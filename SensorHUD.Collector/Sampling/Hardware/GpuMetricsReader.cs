@@ -31,15 +31,24 @@ internal static class GpuMetricsReader
         string deviceId = SensorLookup.StableDeviceId(gpu);
         SensorLookup.BufferAll(gpu, sensorBuffer);
 
-        double? usage = Find(SensorType.Load, CoreLoadNames);
-        double? temperature = Find(
+        double? usage = SensorLookup.FirstValue(
+            sensorBuffer,
+            SensorType.Load,
+            CoreLoadNames);
+        double? temperature = SensorLookup.FirstValue(
+            sensorBuffer,
             SensorType.Temperature,
             CoreTemperatureNames);
-        double? vramUsage = Find(SensorType.Load, VramLoadNames);
-        double? usedMegabytes = Find(
+        double? vramUsage = SensorLookup.FirstValue(
+            sensorBuffer,
+            SensorType.Load,
+            VramLoadNames);
+        double? usedMegabytes = SensorLookup.FirstValue(
+            sensorBuffer,
             SensorType.SmallData,
             VramUsedNames);
-        double? totalMegabytes = Find(
+        double? totalMegabytes = SensorLookup.FirstValue(
+            sensorBuffer,
             SensorType.SmallData,
             VramTotalNames);
 
@@ -50,38 +59,68 @@ internal static class GpuMetricsReader
             vramUsage = usedMegabytes / totalMegabytes * 100;
         }
 
-        Add(MetricRegistry.GpuUsage, usage, "GPU usage");
-        Add(
+        AddReading(
+            readings,
+            MetricRegistry.GpuUsage,
+            usage,
+            "GPU usage",
+            gpu.Name,
+            deviceId,
+            hardwareAccessError);
+        AddReading(
+            readings,
             MetricRegistry.GpuTemperature,
             temperature,
-            "GPU temperature");
-        Add(MetricRegistry.GpuVramUsage, vramUsage, "VRAM usage");
-        Add(
+            "GPU temperature",
+            gpu.Name,
+            deviceId,
+            hardwareAccessError);
+        AddReading(
+            readings,
+            MetricRegistry.GpuVramUsage,
+            vramUsage,
+            "VRAM usage",
+            gpu.Name,
+            deviceId,
+            hardwareAccessError);
+        AddReading(
+            readings,
             MetricRegistry.GpuVramUsed,
             usedMegabytes / MegabytesPerGigabyte,
-            "VRAM used");
-        Add(
+            "VRAM used",
+            gpu.Name,
+            deviceId,
+            hardwareAccessError);
+        AddReading(
+            readings,
             MetricRegistry.GpuVramTotal,
             totalMegabytes / MegabytesPerGigabyte,
-            "VRAM total");
+            "VRAM total",
+            gpu.Name,
+            deviceId,
+            hardwareAccessError);
+    }
 
-        double? Find(SensorType type, string[] names) =>
-            SensorLookup.FirstValue(sensorBuffer, type, names);
-
-        void Add(string metricId, double? value, string label)
-        {
-            readings.Add(value is null
-                ? HardwareReading.Unavailable(
-                    metricId,
-                    gpu.Name,
-                    $"{label} is not exposed for {gpu.Name}.",
-                    hardwareAccessError,
-                    deviceId)
-                : HardwareReading.Value(
-                    metricId,
-                    value,
-                    gpu.Name,
-                    deviceId));
-        }
+    private static void AddReading(
+        ICollection<MetricReading> readings,
+        string metricId,
+        double? value,
+        string label,
+        string deviceName,
+        string deviceId,
+        string? hardwareAccessError)
+    {
+        readings.Add(value is null
+            ? HardwareReading.Unavailable(
+                metricId,
+                deviceName,
+                $"{label} is not exposed for {deviceName}.",
+                hardwareAccessError,
+                deviceId)
+            : HardwareReading.Value(
+                metricId,
+                value,
+                deviceName,
+                deviceId));
     }
 }

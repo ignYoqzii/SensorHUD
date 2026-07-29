@@ -1,12 +1,14 @@
 using LibreHardwareMonitor.Hardware;
-using SensorHUD.Core.Metrics;
+using SensorHUD.Collector.Sampling.Network;
 using SensorHUD.Core.Telemetry;
 
 namespace SensorHUD.Collector.Sampling.Hardware;
 
 /// <summary>
 /// Owns the single LibreHardwareMonitor <see cref="Computer"/>, performs one
-/// update pass, enumerates devices, and delegates mapping to focused readers.
+/// guarded update pass, enumerates devices, and delegates mapping to focused
+/// readers. Sources that do not depend on LibreHardwareMonitor remain
+/// available when its startup or sampling fails.
 /// </summary>
 internal sealed class HardwareMetricsProvider :
     ITelemetryProvider,
@@ -47,45 +49,56 @@ internal sealed class HardwareMetricsProvider :
     public IReadOnlyList<MetricReading> Sample()
     {
         List<MetricReading> readings = new(24);
-        if (_startupError is not null)
-        {
-            AddGlobalUnavailable(readings, _startupError);
-            return readings;
-        }
-
-        _computer.Accept(Visitor);
         _gpuBuffer.Clear();
         _networkBuffer.Clear();
         IHardware? cpu = null;
-        foreach (IHardware hardware in _computer.Hardware)
+        string? monitorError = _startupError;
+        if (_startupError is null)
         {
-            switch (hardware.HardwareType)
+            try
             {
-                case HardwareType.Cpu:
-                    cpu = hardware;
-                    break;
-                case HardwareType.GpuAmd:
-                case HardwareType.GpuIntel:
-                case HardwareType.GpuNvidia:
-                    _gpuBuffer.Add(hardware);
-                    break;
-                case HardwareType.Network:
-                    _networkBuffer.Add(hardware);
-                    break;
+                _computer.Accept(Visitor);
+                foreach (IHardware hardware in _computer.Hardware)
+                {
+                    switch (hardware.HardwareType)
+                    {
+                        case HardwareType.Cpu:
+                            cpu = hardware;
+                            break;
+                        case HardwareType.GpuAmd:
+                        case HardwareType.GpuIntel:
+                        case HardwareType.GpuNvidia:
+                            _gpuBuffer.Add(hardware);
+                            break;
+                        case HardwareType.Network:
+                            _networkBuffer.Add(hardware);
+                            break;
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                monitorError = exception.Message;
+                cpu = null;
+                _gpuBuffer.Clear();
+                _networkBuffer.Clear();
             }
         }
 
+        string? hardwareError = CombineErrors(
+            monitorError,
+            _hardwareAccessError);
         CpuMetricsReader.Read(
             cpu,
             _sensorBuffer,
             readings,
-            _hardwareAccessError);
-        MemoryMetricsReader.Read(readings, _hardwareAccessError);
-        NetworkMetricsReader.Read(
+            hardwareError);
+        MemoryMetricsReader.Read(readings);
+        AdapterThroughputMetricsReader.Read(
             _networkBuffer,
             _sensorBuffer,
             readings,
-            _hardwareAccessError);
+            monitorError);
         foreach (IHardware gpu in _gpuBuffer)
         {
             GpuMetricsReader.Read(
@@ -110,37 +123,12 @@ internal sealed class HardwareMetricsProvider :
         }
     }
 
-    private void AddGlobalUnavailable(
-        ICollection<MetricReading> readings,
-        string error)
-    {
-        foreach (string metricId in new[]
-        {
-            MetricRegistry.CpuUsage,
-            MetricRegistry.CpuTemperature,
-            MetricRegistry.MemoryUsage,
-            MetricRegistry.MemoryUsed,
-            MetricRegistry.MemoryTotal,
-            MetricRegistry.NetworkSend,
-            MetricRegistry.NetworkReceive,
-        })
-        {
-            string deviceName = metricId.StartsWith(
-                "cpu.",
-                StringComparison.Ordinal)
-                ? "CPU"
-                : metricId.StartsWith(
-                    "memory.",
-                    StringComparison.Ordinal)
-                    ? "System Memory"
-                    : "Network";
-            readings.Add(HardwareReading.Unavailable(
-                metricId,
-                deviceName,
-                error,
-                _hardwareAccessError));
-        }
-    }
+    private static string? CombineErrors(string? first, string? second) =>
+        string.IsNullOrWhiteSpace(first)
+            ? second
+            : string.IsNullOrWhiteSpace(second)
+                ? first
+                : $"{first} {second}";
 
     private sealed class UpdateVisitor : IVisitor
     {

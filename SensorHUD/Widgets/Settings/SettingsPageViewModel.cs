@@ -15,25 +15,26 @@ namespace SensorHUD.Widgets.Settings;
 /// Extension path:
 /// 1. New global setting: add its model/default/validation, expose it through
 ///    the relevant section view model, then add one XAML control.
-/// 2. New metric: add one registry definition and one provider reading.
-/// 3. New hardware source: implement a provider and register it in the
+/// 2. New metric or category: declare its metadata in the metric registry and
+///    publish readings; settings cards are generated here automatically.
+/// 3. New independent source: implement a provider and register it in the
 ///    collector's TelemetrySampler.
 /// </summary>
 public sealed class SettingsPageViewModel
 {
     private readonly Dictionary<string, MetricDisplaySettings>
-        _retainedPreferences;
+        _savedMetricSettings;
 
     internal SettingsPageViewModel(
         WidgetSettings settings,
         TelemetrySnapshot? snapshot)
     {
         WidgetSettings normalized = SettingsValidator.Normalize(settings);
-        _retainedPreferences = ClonePreferences(normalized.Metrics);
+        _savedMetricSettings = CloneMetricSettings(normalized.Metrics);
         Layout = new LayoutSettingsViewModel(normalized);
         Appearance = new AppearanceSettingsViewModel(normalized.Appearance);
         Status = new CollectorStatusViewModel();
-        MetricGroups = CreateMetricGroups(snapshot);
+        MetricCategories = CreateMetricCategories(snapshot);
 
         Layout.Changed += Section_Changed;
         Appearance.Changed += Section_Changed;
@@ -47,7 +48,7 @@ public sealed class SettingsPageViewModel
 
     public CollectorStatusViewModel Status { get; }
 
-    public IReadOnlyList<MetricGroupViewModel> MetricGroups { get; }
+    public IReadOnlyList<MetricCategoryViewModel> MetricCategories { get; }
 
     public string VersionText
     {
@@ -63,46 +64,69 @@ public sealed class SettingsPageViewModel
     internal WidgetSettings ToSettings()
     {
         WidgetSettings result = SettingsDefaults.Create();
-        result.Metrics = ClonePreferences(_retainedPreferences);
+        result.Metrics = CloneMetricSettings(_savedMetricSettings);
         Layout.ApplyTo(result);
         Appearance.ApplyTo(result);
 
         foreach (MetricSettingsViewModel metric in
-                 MetricGroups.SelectMany(group => group.Metrics))
+                 MetricCategories.SelectMany(category => category.Metrics))
         {
             result.Metrics[metric.Key] = metric.ToSettings();
         }
 
-        return SettingsValidator.Normalize(result);
+        return result;
     }
 
-    private IReadOnlyList<MetricGroupViewModel> CreateMetricGroups(
+    private IReadOnlyList<MetricCategoryViewModel> CreateMetricCategories(
         TelemetrySnapshot? snapshot)
     {
-        List<MetricGroupViewModel> groups = [];
-        foreach (MetricGroup group in Enum.GetValues<MetricGroup>())
+        List<MetricCategoryViewModel> categories =
+            new(MetricRegistry.Categories.Count);
+        foreach (MetricCategoryDefinition category in
+                 MetricRegistry.Categories)
         {
-            if (group == MetricGroup.Gpu)
+            MetricDefinition[] definitions = MetricRegistry.All
+                .Where(definition =>
+                    definition.Category == category.Id)
+                .OrderBy(definition => definition.SortOrder)
+                .ToArray();
+            MetricDefinition[] globalDefinitions = definitions
+                .Where(definition => !definition.IsPerDevice)
+                .ToArray();
+            if (globalDefinitions.Length > 0)
             {
-                AddGpuGroups(groups, snapshot);
-                continue;
+                categories.Add(new MetricCategoryViewModel(
+                    category.Name,
+                    category.Description,
+                    globalDefinitions
+                        .Select(definition =>
+                            CreateMetric(definition, null))
+                        .ToList()));
             }
 
-            List<MetricSettingsViewModel> metrics = MetricRegistry.All
-                .Where(definition => definition.Group == group)
-                .OrderBy(definition => definition.SortOrder)
-                .Select(definition => CreateMetric(definition, null, null))
-                .ToList();
-            groups.Add(new MetricGroupViewModel(
-                MetricRegistry.GetGroupLabel(group),
-                metrics));
+            MetricDefinition[] deviceDefinitions = definitions
+                .Where(definition => definition.IsPerDevice)
+                .ToArray();
+            if (deviceDefinitions.Length > 0)
+            {
+                AddDeviceCategories(
+                    categories,
+                    category,
+                    deviceDefinitions,
+                    snapshot);
+            }
         }
 
-        return groups;
+        return categories;
     }
 
-    private void AddGpuGroups(
-        ICollection<MetricGroupViewModel> groups,
+    /// <summary>
+    /// Adds one category card per detected device for per-device metrics.
+    /// </summary>
+    private void AddDeviceCategories(
+        ICollection<MetricCategoryViewModel> categories,
+        MetricCategoryDefinition category,
+        IReadOnlyList<MetricDefinition> definitions,
         TelemetrySnapshot? snapshot)
     {
         var devices = (snapshot?.Readings ?? [])
@@ -110,7 +134,8 @@ public sealed class SettingsPageViewModel
                 MetricRegistry.TryGet(
                     reading.MetricId,
                     out MetricDefinition definition) &&
-                definition.Group == MetricGroup.Gpu &&
+                definition.Category == category.Id &&
+                definition.IsPerDevice &&
                 !string.IsNullOrWhiteSpace(reading.DeviceId))
             .GroupBy(reading => reading.DeviceId!, StringComparer.Ordinal)
             .OrderBy(
@@ -121,33 +146,30 @@ public sealed class SettingsPageViewModel
         {
             string deviceName = string.IsNullOrWhiteSpace(
                 device.First().DeviceName)
-                ? "GPU"
+                ? category.Name
                 : device.First().DeviceName!;
-            List<MetricSettingsViewModel> metrics = MetricRegistry.All
-                .Where(definition => definition.Group == MetricGroup.Gpu)
-                .OrderBy(definition => definition.SortOrder)
+            List<MetricSettingsViewModel> metrics = definitions
                 .Select(definition =>
-                    CreateMetric(definition, device.Key, deviceName))
+                    CreateMetric(definition, device.Key))
                 .ToList();
-            groups.Add(new MetricGroupViewModel(
-                $"GPU - {deviceName}",
+            categories.Add(new MetricCategoryViewModel(
+                $"{category.Name} - {deviceName}",
+                category.Description,
                 metrics));
         }
     }
 
     private MetricSettingsViewModel CreateMetric(
         MetricDefinition definition,
-        string? deviceId,
-        string? deviceName)
+        string? deviceId)
     {
         string key = MetricInstanceKey.Create(definition, deviceId);
-        _retainedPreferences.TryGetValue(
+        _savedMetricSettings.TryGetValue(
             key,
             out MetricDisplaySettings? preference);
         MetricSettingsViewModel metric = new(
             key,
             definition,
-            deviceName,
             preference);
         metric.Changed += Section_Changed;
         return metric;
@@ -156,15 +178,15 @@ public sealed class SettingsPageViewModel
     private void Section_Changed(object? sender, EventArgs e) =>
         Changed?.Invoke(this, EventArgs.Empty);
 
-    private static Dictionary<string, MetricDisplaySettings> ClonePreferences(
+    private static Dictionary<string, MetricDisplaySettings> CloneMetricSettings(
         IReadOnlyDictionary<string, MetricDisplaySettings> preferences) =>
         preferences.ToDictionary(
             pair => pair.Key,
             pair => new MetricDisplaySettings
             {
                 IsVisible = pair.Value.IsVisible,
-                Template = pair.Value.Template,
-                Precision = pair.Value.Precision,
+                Format = pair.Value.Format,
+                Decimals = pair.Value.Decimals,
             },
             StringComparer.Ordinal);
 }

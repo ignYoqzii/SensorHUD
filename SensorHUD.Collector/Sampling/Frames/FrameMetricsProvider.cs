@@ -72,7 +72,7 @@ internal sealed class FrameMetricsProvider :
 /// <summary>
 /// Frame provider state copied into collector health.
 /// </summary>
-internal sealed record FrameProviderStatus(
+internal readonly record struct FrameProviderStatus(
     FrameCaptureState State,
     string? TargetProcess = null,
     string? Error = null);

@@ -57,12 +57,13 @@ internal static class Program
             // installer runs only when PawnIO is missing, damaged, or older
             // than the required version.
             PawnIoDependency.PawnIoResult pawnIo =
-                await PawnIoDependency.EnsureReadyAsync();
+                await PawnIoDependency.EnsureReadyAsync()
+                    .ConfigureAwait(false);
             using TelemetrySampler sampler =
                 TelemetrySampler.CreateDefault(pawnIo);
             SecurePipeServer pipeServer = new(packageFamilyName);
             CollectorHost host = new(sampler, pipeServer);
-            await host.RunAsync();
+            await host.RunAsync().ConfigureAwait(false);
         }
         finally
         {

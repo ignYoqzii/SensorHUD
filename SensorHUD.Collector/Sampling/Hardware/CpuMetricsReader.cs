@@ -66,15 +66,16 @@ internal static class CpuMetricsReader
     private static double? FindTemperature(
         IReadOnlyList<ISensor> sensors)
     {
-        ISensor? package = sensors.FirstOrDefault(sensor =>
-            sensor.SensorType == SensorType.Temperature &&
-            sensor.Value.HasValue &&
-            sensor.Name.Contains(
-                "Package",
-                StringComparison.OrdinalIgnoreCase));
-        if (package?.Value is float packageValue)
+        foreach (ISensor sensor in sensors)
         {
-            return packageValue;
+            if (sensor.SensorType == SensorType.Temperature &&
+                sensor.Value is float value &&
+                sensor.Name.Contains(
+                    "Package",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return value;
+            }
         }
 
         double? maximum = null;

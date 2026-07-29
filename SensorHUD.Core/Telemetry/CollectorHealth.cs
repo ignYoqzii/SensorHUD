@@ -16,7 +16,7 @@ public enum PawnIoState
 public enum FrameCaptureState
 {
     Starting,
-    WaitingForGame,
+    WaitingForProcess,
     WarmingUp,
     Active,
     Unavailable,
@@ -37,7 +37,11 @@ public sealed class CollectorHealth
 
     public FrameCaptureState FrameCaptureState { get; set; }
 
-    public string? FrameTargetProcess { get; set; }
+    /// <summary>
+    /// Process selected from recent presentation activity for frame
+    /// telemetry.
+    /// </summary>
+    public string? ForegroundProcess { get; set; }
 
     public string? FrameCaptureError { get; set; }
 

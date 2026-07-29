@@ -12,43 +12,41 @@ namespace SensorHUD.Widgets.Settings;
 public sealed class MetricSettingsViewModel : ObservableObject
 {
     private bool _isVisible;
-    private string _template;
-    private PrecisionOption _selectedPrecision;
+    private string _format;
+    private DecimalOption _selectedDecimals;
 
     internal MetricSettingsViewModel(
         string key,
         MetricDefinition definition,
-        string? deviceName,
         MetricDisplaySettings? settings)
     {
         Key = key;
-        Name = definition.Label;
-        DeviceName = deviceName ?? string.Empty;
+        Name = definition.Name;
         UnitDescription = $"Unit: {definition.Unit}";
         _isVisible =
             settings?.IsVisible ?? definition.IsVisibleByDefault;
-        _template = string.IsNullOrWhiteSpace(settings?.Template)
-            ? definition.DefaultTemplate
-            : settings.Template;
+        _format = string.IsNullOrWhiteSpace(settings?.Format)
+            ? definition.Format
+            : settings.Format;
 
-        List<PrecisionOption> options =
+        List<DecimalOption> options =
         [
-            new($"Default ({definition.DefaultPrecision})", null),
+            new($"Default ({definition.Decimals})", null),
         ];
-        for (int precision = SettingsDefaults.MinimumPrecision;
-             precision <= SettingsDefaults.MaximumPrecision;
-             precision++)
+        for (int decimals = SettingsDefaults.MinimumDecimals;
+             decimals <= SettingsDefaults.MaximumDecimals;
+             decimals++)
         {
-            options.Add(new PrecisionOption(
-                precision == 1
+            options.Add(new DecimalOption(
+                decimals == 1
                     ? "1 decimal"
-                    : $"{precision} decimals",
-                precision));
+                    : $"{decimals} decimals",
+                decimals));
         }
 
-        PrecisionOptions = options;
-        _selectedPrecision = options.First(option =>
-            option.Value == settings?.Precision);
+        DecimalOptions = options;
+        _selectedDecimals = options.First(option =>
+            option.Value == settings?.Decimals);
     }
 
     public event EventHandler? Changed;
@@ -57,11 +55,9 @@ public sealed class MetricSettingsViewModel : ObservableObject
 
     public string Name { get; }
 
-    public string DeviceName { get; }
-
     public string UnitDescription { get; }
 
-    public IReadOnlyList<PrecisionOption> PrecisionOptions { get; }
+    public IReadOnlyList<DecimalOption> DecimalOptions { get; }
 
     public bool IsVisible
     {
@@ -69,20 +65,20 @@ public sealed class MetricSettingsViewModel : ObservableObject
         set => SetSetting(ref _isVisible, value);
     }
 
-    public string Template
+    public string Format
     {
-        get => _template;
-        set => SetSetting(ref _template, value ?? string.Empty);
+        get => _format;
+        set => SetSetting(ref _format, value ?? string.Empty);
     }
 
-    public PrecisionOption SelectedPrecision
+    public DecimalOption SelectedDecimals
     {
-        get => _selectedPrecision;
+        get => _selectedDecimals;
         set
         {
             if (value is not null)
             {
-                SetSetting(ref _selectedPrecision, value);
+                SetSetting(ref _selectedDecimals, value);
             }
         }
     }
@@ -90,8 +86,8 @@ public sealed class MetricSettingsViewModel : ObservableObject
     internal MetricDisplaySettings ToSettings() => new()
     {
         IsVisible = IsVisible,
-        Template = Template,
-        Precision = SelectedPrecision.Value,
+        Format = Format,
+        Decimals = SelectedDecimals.Value,
     };
 
     private void SetSetting<T>(ref T field, T value)
@@ -104,29 +100,6 @@ public sealed class MetricSettingsViewModel : ObservableObject
 }
 
 /// <summary>
-/// User-facing precision choice. Null means the registry default.
+/// User-facing decimal choice. Null means the registry default.
 /// </summary>
-public sealed record PrecisionOption(string Label, int? Value);
-
-/// <summary>
-/// One settings card containing related metrics.
-/// </summary>
-public sealed class MetricGroupViewModel
-{
-    internal MetricGroupViewModel(
-        string name,
-        IReadOnlyList<MetricSettingsViewModel> metrics)
-    {
-        Name = name;
-        Metrics = metrics;
-        MetricCountText = metrics.Count == 1
-            ? "1 metric"
-            : $"{metrics.Count} metrics";
-    }
-
-    public string Name { get; }
-
-    public string MetricCountText { get; }
-
-    public IReadOnlyList<MetricSettingsViewModel> Metrics { get; }
-}
+public sealed record DecimalOption(string Label, int? Value);

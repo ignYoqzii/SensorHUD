@@ -1,7 +1,7 @@
 namespace SensorHUD.Collector.Sampling.Frames;
 
 /// <summary>
-/// ETW identifiers, time windows, and target exclusions for frame capture.
+/// ETW identifiers, time windows, and process exclusions for frame capture.
 /// </summary>
 internal static class FrameCaptureDefaults
 {

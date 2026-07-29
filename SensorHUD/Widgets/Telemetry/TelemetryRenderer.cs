@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using SensorHUD.Core.Metrics;
 using SensorHUD.Core.Settings;
 using SensorHUD.Presentation;
@@ -22,8 +21,9 @@ internal sealed class TelemetryRenderer
     private readonly ItemsControl _verticalItems;
     private readonly TextBlock _horizontalText;
     private readonly Dictionary<string, RenderNode> _nodes = [];
+    private readonly List<string> _renderedKeys = [];
 
-    private string _structureSignature = string.Empty;
+    private WidgetSettings? _renderedSettings;
 
     public TelemetryRenderer(
         ItemsControl verticalItems,
@@ -37,13 +37,8 @@ internal sealed class TelemetryRenderer
         TelemetryDisplayModel model,
         WidgetSettings settings)
     {
-        string signature = CreateStructureSignature(model, settings);
-        if (!string.Equals(
-                signature,
-                _structureSignature,
-                StringComparison.Ordinal))
+        if (NeedsRebuild(model, settings))
         {
-            _structureSignature = signature;
             Rebuild(model, settings);
         }
         else
@@ -63,7 +58,14 @@ internal sealed class TelemetryRenderer
         TelemetryDisplayModel model,
         WidgetSettings settings)
     {
+        _renderedSettings = settings;
         _nodes.Clear();
+        _renderedKeys.Clear();
+        foreach (PresentedMetric metric in model.Metrics)
+        {
+            _renderedKeys.Add(metric.Key);
+        }
+
         _verticalItems.Items.Clear();
         _horizontalText.Inlines.Clear();
         ApplyTextStyle(_horizontalText, settings.Appearance);
@@ -131,7 +133,7 @@ internal sealed class TelemetryRenderer
         PresentedMetric metric,
         WidgetSettings settings)
     {
-        List<Run> runs = [];
+        List<Run> runs = new(metric.Parts.Count);
         foreach (MetricTextPart part in metric.Parts)
         {
             Run run = new() { Text = part.Text };
@@ -168,15 +170,20 @@ internal sealed class TelemetryRenderer
     {
         if (layout == WidgetLayout.Horizontal)
         {
-            string[] errors = model.Metrics
-                .Where(metric =>
-                    !string.IsNullOrWhiteSpace(metric.Reading?.Error))
-                .Select(metric =>
-                    $"{metric.Definition.Label}: {metric.Reading!.Error}")
-                .ToArray();
+            List<string>? errors = null;
+            foreach (PresentedMetric metric in model.Metrics)
+            {
+                if (!string.IsNullOrWhiteSpace(metric.Reading?.Error))
+                {
+                    errors ??= [];
+                    errors.Add(
+                        $"{metric.Definition.Name}: {metric.Reading.Error}");
+                }
+            }
+
             ToolTipService.SetToolTip(
                 _horizontalText,
-                errors.Length == 0
+                errors is null
                     ? null
                     : string.Join(Environment.NewLine, errors));
             return;
@@ -233,21 +240,36 @@ internal sealed class TelemetryRenderer
         return trimmed.Length == 0 ? " " : $" {trimmed} ";
     }
 
-    private static string CreateStructureSignature(
+    private bool NeedsRebuild(
         TelemetryDisplayModel model,
-        WidgetSettings settings) => string.Join(
-            "|",
-            settings.Layout,
-            settings.HorizontalSeparator,
-            settings.Appearance.FontFamily,
-            settings.Appearance.FontWeight,
-            settings.Appearance.FontSize,
-            settings.Appearance.FontColor,
-            string.Join(
-                ";",
-                model.Metrics.Select(metric =>
-                    $"{metric.Key}:{metric.Settings?.Template ??
-                        metric.Definition.DefaultTemplate}")));
+        WidgetSettings settings)
+    {
+        if (!ReferenceEquals(_renderedSettings, settings) ||
+            _nodes.Count != model.Metrics.Count)
+        {
+            return true;
+        }
+
+        for (int index = 0; index < model.Metrics.Count; index++)
+        {
+            PresentedMetric metric = model.Metrics[index];
+            if (!string.Equals(
+                    _renderedKeys[index],
+                    metric.Key,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (!_nodes.TryGetValue(metric.Key, out RenderNode? node) ||
+                node.Runs.Count != metric.Parts.Count)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private sealed record RenderNode(
         TextBlock Target,

@@ -92,10 +92,10 @@
                             <TextBlock Grid.Row="3" Grid.Column="1"
                                        Text="{x:Bind ViewModel.Status.PawnIo, Mode=OneWay}"
                                        Style="{StaticResource StatusValueStyle}" />
-                            <TextBlock Grid.Row="4" Text="Frame metrics"
+                            <TextBlock Grid.Row="4" Text="Foreground process"
                                        Style="{StaticResource StatusLabelStyle}" />
                             <TextBlock Grid.Row="4" Grid.Column="1"
-                                       Text="{x:Bind ViewModel.Status.Frames, Mode=OneWay}"
+                                       Text="{x:Bind ViewModel.Status.ForegroundProcess, Mode=OneWay}"
                                        Style="{StaticResource StatusValueStyle}" />
                             <TextBlock Grid.Row="5" Text="Processor"
                                        Style="{StaticResource StatusLabelStyle}" />
@@ -242,12 +242,12 @@
                     <TextBlock Text="Metrics"
                                FontSize="23"
                                FontWeight="SemiBold" />
-                    <TextBlock Text="Customize visibility, precision, and templates. Available tokens: {value}, {unit}, {name}, and {device}."
+                    <TextBlock Text="Customize visibility, decimals, and formats. Available tokens: {value}, {unit}, {name}, and {device}."
                                Style="{StaticResource SectionDescriptionStyle}" />
                 </StackPanel>
-                <ItemsControl ItemsSource="{x:Bind ViewModel.MetricGroups, Mode=OneTime}">
+                <ItemsControl ItemsSource="{x:Bind ViewModel.MetricCategories, Mode=OneTime}">
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="viewModels:MetricGroupViewModel">
+                        <DataTemplate x:DataType="viewModels:MetricCategoryViewModel">
                             <Border Margin="0,0,0,14"
                                     Style="{StaticResource SectionCardStyle}">
                                 <StackPanel Spacing="12">
@@ -256,8 +256,13 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{x:Bind Name}"
-                                                   Style="{StaticResource SectionTitleStyle}" />
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Text="{x:Bind Name}"
+                                                       Style="{StaticResource SectionTitleStyle}" />
+                                            <TextBlock Text="{x:Bind Description}"
+                                                       Visibility="{x:Bind DescriptionVisibility}"
+                                                       Style="{StaticResource SectionDescriptionStyle}" />
+                                        </StackPanel>
                                         <TextBlock Grid.Column="1"
                                                    Text="{x:Bind MetricCountText}"
                                                    FontSize="12"
@@ -274,17 +279,17 @@
                                                                       IsOn="{x:Bind IsVisible, Mode=TwoWay}"
                                                                       OnContent="On"
                                                                       OffContent="Off" />
-                                                        <TextBox Header="Template"
+                                                        <TextBox Header="Format"
                                                                  CornerRadius="4"
-                                                                 Text="{x:Bind Template, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                 Text="{x:Bind Format, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                                  Description="{x:Bind UnitDescription}" />
-                                                        <ComboBox Header="Decimal precision"
+                                                        <ComboBox Header="Decimals"
                                                                   CornerRadius="4"
-                                                                  ItemsSource="{x:Bind PrecisionOptions}"
-                                                                  SelectedItem="{x:Bind SelectedPrecision, Mode=TwoWay}"
+                                                                  ItemsSource="{x:Bind DecimalOptions}"
+                                                                  SelectedItem="{x:Bind SelectedDecimals, Mode=TwoWay}"
                                                                   HorizontalAlignment="Stretch">
                                                             <ComboBox.ItemTemplate>
-                                                                <DataTemplate x:DataType="viewModels:PrecisionOption">
+                                                                <DataTemplate x:DataType="viewModels:DecimalOption">
                                                                     <TextBlock Text="{x:Bind Label}" />
                                                                 </DataTemplate>
                                                             </ComboBox.ItemTemplate>

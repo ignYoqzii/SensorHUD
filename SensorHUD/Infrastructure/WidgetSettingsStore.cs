@@ -47,16 +47,18 @@ internal sealed class WidgetSettingsStore
         }
     }
 
+    /// <summary>
+    /// Atomically saves settings already normalized by the editing boundary.
+    /// </summary>
     public async Task SaveAsync(WidgetSettings settings)
     {
-        WidgetSettings normalized = SettingsValidator.Normalize(settings);
         await _fileLock.WaitAsync();
         try
         {
             string destination = GetPath();
             string temporary = destination + ".tmp";
             string json = JsonSerializer.Serialize(
-                normalized,
+                settings,
                 SettingsJsonContext.Default.WidgetSettings);
             await File.WriteAllTextAsync(temporary, json);
             File.Move(temporary, destination, true);

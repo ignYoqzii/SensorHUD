@@ -1,13 +1,15 @@
 using LibreHardwareMonitor.Hardware;
+using SensorHUD.Collector.Sampling.Hardware;
 using SensorHUD.Core.Metrics;
 using SensorHUD.Core.Telemetry;
 
-namespace SensorHUD.Collector.Sampling.Hardware;
+namespace SensorHUD.Collector.Sampling.Network;
 
 /// <summary>
-/// Aggregates throughput across network interfaces into send/receive metrics.
+/// Maps LibreHardwareMonitor network-interface sensors into aggregate adapter
+/// send and receive throughput readings.
 /// </summary>
-internal static class NetworkMetricsReader
+internal static class AdapterThroughputMetricsReader
 {
     private const double BytesToMegabits = 8d / 1_000_000d;
     private const string DeviceName = "Network";
@@ -16,6 +18,9 @@ internal static class NetworkMetricsReader
     private static readonly string[] DownloadNames =
         ["Download Speed", "Download"];
 
+    /// <summary>
+    /// Adds aggregate throughput across every detected network interface.
+    /// </summary>
     public static void Read(
         IReadOnlyList<IHardware> networks,
         List<ISensor> sensorBuffer,

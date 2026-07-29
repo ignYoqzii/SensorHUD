@@ -7,8 +7,8 @@ using SensorHUD.Infrastructure;
 namespace SensorHUD.Widgets.Settings;
 
 /// <summary>
-/// Publishes edits immediately, debounces atomic persistence, and flushes the
-/// most recent model when the settings widget closes.
+/// Publishes validated edits immediately, orders debounced atomic writes, and
+/// flushes the most recent unsaved model when the settings widget closes.
 /// </summary>
 internal sealed class SettingsAutoSaver : IDisposable
 {
@@ -35,7 +35,9 @@ internal sealed class SettingsAutoSaver : IDisposable
             _delayCancellation?.Cancel();
             _delayCancellation?.Dispose();
             _delayCancellation = new CancellationTokenSource();
+            Task previousSave = _pendingSave;
             _pendingSave = SaveAfterDelayAsync(
+                previousSave,
                 normalized,
                 _delayCancellation.Token);
         }
@@ -43,13 +45,10 @@ internal sealed class SettingsAutoSaver : IDisposable
 
     public async Task FlushAsync()
     {
-        WidgetSettings? pending;
         Task pendingSave;
         lock (_sync)
         {
             _delayCancellation?.Cancel();
-            pending = _pendingSettings;
-            _pendingSettings = null;
             pendingSave = _pendingSave;
         }
 
@@ -62,9 +61,25 @@ internal sealed class SettingsAutoSaver : IDisposable
             // A final explicit save below remains the authoritative attempt.
         }
 
+        WidgetSettings? pending;
+        lock (_sync)
+        {
+            pending = _pendingSettings;
+            _pendingSettings = null;
+        }
+
         if (pending is not null)
         {
-            await _store.SaveAsync(pending);
+            try
+            {
+                await _store.SaveAsync(pending);
+            }
+            catch (Exception exception)
+                when (exception is System.IO.IOException or
+                    UnauthorizedAccessException)
+            {
+                // A storage failure during teardown must not crash Game Bar.
+            }
         }
     }
 
@@ -79,11 +94,21 @@ internal sealed class SettingsAutoSaver : IDisposable
     }
 
     private async Task SaveAfterDelayAsync(
+        Task previousSave,
         WidgetSettings settings,
         CancellationToken cancellationToken)
     {
         try
         {
+            try
+            {
+                await previousSave;
+            }
+            catch
+            {
+                // A later valid edit must not be blocked by an earlier save.
+            }
+
             await Task.Delay(
                 SettingsDefaults.SaveDebounce,
                 cancellationToken);

@@ -22,6 +22,9 @@ public static class PipeMessageSerializer
         CollectorMessage message,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(stream);
+        ArgumentNullException.ThrowIfNull(message);
+
         byte[] payload = JsonSerializer.SerializeToUtf8Bytes(
             message,
             CollectorJsonContext.Default.CollectorMessage);
@@ -46,6 +49,8 @@ public static class PipeMessageSerializer
         Stream stream,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(stream);
+
         byte[] header = new byte[HeaderLength];
         if (!await TryReadExactlyAsync(stream, header, cancellationToken)
                 .ConfigureAwait(false))

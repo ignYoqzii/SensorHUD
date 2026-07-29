@@ -50,14 +50,14 @@ public static class SettingsValidator
             result.Metrics[key] = new MetricDisplaySettings
             {
                 IsVisible = preference.IsVisible,
-                Template = string.IsNullOrWhiteSpace(preference.Template)
-                    ? definition.DefaultTemplate
-                    : preference.Template,
-                Precision = preference.Precision is int precision
+                Format = string.IsNullOrWhiteSpace(preference.Format)
+                    ? definition.Format
+                    : preference.Format,
+                Decimals = preference.Decimals is int decimals
                     ? Math.Clamp(
-                        precision,
-                        SettingsDefaults.MinimumPrecision,
-                        SettingsDefaults.MaximumPrecision)
+                        decimals,
+                        SettingsDefaults.MinimumDecimals,
+                        SettingsDefaults.MaximumDecimals)
                     : null,
             };
         }

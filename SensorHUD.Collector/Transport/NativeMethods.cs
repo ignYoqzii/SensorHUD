@@ -2,6 +2,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 
+[assembly: DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+
 namespace SensorHUD.Collector.Transport;
 
 /// <summary>
@@ -77,7 +79,7 @@ internal static class NativeMethods
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool GlobalMemoryStatusEx(
-        [In, Out] MemoryStatus memoryStatus);
+        ref MemoryStatus memoryStatus);
 
     [DllImport("user32.dll")]
     internal static extern nint GetForegroundWindow();
@@ -88,9 +90,9 @@ internal static class NativeMethods
         out uint processId);
 
     [StructLayout(LayoutKind.Sequential)]
-    internal sealed class MemoryStatus
+    internal struct MemoryStatus
     {
-        public uint Length = (uint)Marshal.SizeOf<MemoryStatus>();
+        public uint Length;
         public uint MemoryLoad;
         public ulong TotalPhys;
         public ulong AvailPhys;
@@ -99,5 +101,10 @@ internal static class NativeMethods
         public ulong TotalVirtual;
         public ulong AvailVirtual;
         public ulong AvailExtendedVirtual;
+
+        public static MemoryStatus Create() => new()
+        {
+            Length = (uint)Marshal.SizeOf<MemoryStatus>(),
+        };
     }
 }

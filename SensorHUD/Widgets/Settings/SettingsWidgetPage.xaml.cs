@@ -186,9 +186,11 @@ public sealed partial class SettingsWidgetPage : Page
                     MetricRegistry.TryGet(
                         reading.MetricId,
                         out MetricDefinition definition) &&
-                    definition.Group == MetricGroup.Gpu &&
+                    definition.IsPerDevice &&
                     !string.IsNullOrWhiteSpace(reading.DeviceId))
-                .Select(reading => reading.DeviceId)
+                .Select(reading =>
+                    $"{reading.MetricId}\u001F{reading.DeviceId}\u001F" +
+                    reading.DeviceName)
                 .Distinct(StringComparer.Ordinal)
                 .Order(StringComparer.Ordinal));
 }

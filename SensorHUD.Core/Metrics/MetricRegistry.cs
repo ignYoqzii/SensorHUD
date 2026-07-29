@@ -6,9 +6,8 @@ using System.Linq;
 namespace SensorHUD.Core.Metrics;
 
 /// <summary>
-/// The single source of truth for supported metrics and their display
-/// defaults. To add a metric, add one definition here and publish its reading
-/// from a collector provider.
+/// Central source of truth for metric categories and metrics. The settings UI
+/// and telemetry presenter are generated from this metadata.
 /// </summary>
 public static class MetricRegistry
 {
@@ -27,52 +26,274 @@ public static class MetricRegistry
     public const string MemoryTotal = "memory.total";
     public const string NetworkSend = "network.send";
     public const string NetworkReceive = "network.receive";
+    public const string Ping = "network.ping";
+    public const string PacketLoss = "network.packetLoss";
 
-    private static readonly IReadOnlyList<MetricDefinition> OrderedDefinitions =
-        new ReadOnlyCollection<MetricDefinition>(
+    private static readonly MetricCategoryDefinition[] CategoryDefinitions =
         [
-            new(Fps, MetricGroup.FrameRate, "FPS", "FPS",
-                "{name}: {value} {unit}", 0, true, 0),
-            new(OnePercentLow, MetricGroup.FrameRate, "1% Low", "FPS",
-                "{name}: {value} {unit}", 0, true, 1),
-            new(Frametime, MetricGroup.FrameRate, "Frametime", "ms",
-                "{name}: {value} {unit}", 1, true, 2),
-            new(CpuUsage, MetricGroup.Cpu, "Usage", "%",
-                "{device} Usage: {value}{unit}", 0, true, 0),
-            new(CpuTemperature, MetricGroup.Cpu, "Temperature", "°C",
-                "{device} Temp: {value}{unit}", 0, true, 1),
-            new(GpuUsage, MetricGroup.Gpu, "Usage", "%",
-                "{device} Usage: {value}{unit}", 0, true, 0, true),
-            new(GpuTemperature, MetricGroup.Gpu, "Temperature", "°C",
-                "{device} Temp: {value}{unit}", 0, true, 1, true),
-            new(GpuVramUsage, MetricGroup.Gpu, "VRAM usage", "%",
-                "{device} VRAM: {value}{unit}", 0, true, 2, true),
-            new(GpuVramUsed, MetricGroup.Gpu, "VRAM used", "GB",
-                "{device} VRAM Used: {value} {unit}", 1, false, 3, true),
-            new(GpuVramTotal, MetricGroup.Gpu, "VRAM total", "GB",
-                "{device} VRAM Total: {value} {unit}", 1, false, 4, true),
-            new(MemoryUsage, MetricGroup.Memory, "Usage", "%",
-                "{device} Usage: {value}{unit}", 0, true, 0),
-            new(MemoryUsed, MetricGroup.Memory, "Used", "GB",
-                "{device} Used: {value} {unit}", 1, false, 1),
-            new(MemoryTotal, MetricGroup.Memory, "Total", "GB",
-                "{device} Total: {value} {unit}", 1, false, 2),
-            new(NetworkSend, MetricGroup.Network, "Send", "Mbps",
-                "↑ {value} {unit}", 1, true, 0),
-            new(NetworkReceive, MetricGroup.Network, "Receive", "Mbps",
-                "↓ {value} {unit}", 1, true, 1),
+            new()
+            {
+                Id = MetricCategory.FrameRate,
+                Name = "Frame Rate",
+                Description =
+                    "Frame presentation performance for the foreground process.",
+                SortOrder = 0,
+            },
+            new()
+            {
+                Id = MetricCategory.Cpu,
+                Name = "CPU",
+                Description = "Processor utilization and temperature.",
+                SortOrder = 100,
+            },
+            new()
+            {
+                Id = MetricCategory.Gpu,
+                Name = "GPU",
+                Description =
+                    "Graphics utilization and temperature.",
+                SortOrder = 200,
+            },
+            new()
+            {
+                Id = MetricCategory.Memory,
+                Name = "Memory",
+                Description = "System memory utilization and capacity.",
+                SortOrder = 300,
+            },
+            new()
+            {
+                Id = MetricCategory.Network,
+                Name = "Network",
+                Description =
+                    "Adapter throughput and general Internet connection stability.",
+                SortOrder = 400,
+            },
+        ];
+
+    private static readonly IReadOnlyList<MetricCategoryDefinition>
+        OrderedCategories = new ReadOnlyCollection<MetricCategoryDefinition>(
+            CategoryDefinitions
+                .OrderBy(category => category.SortOrder)
+                .ToArray());
+
+    private static readonly IReadOnlyList<MetricDefinition>
+        OrderedDefinitions = new ReadOnlyCollection<MetricDefinition>(
+        [
+            new()
+            {
+                Id = Fps,
+                Category = MetricCategory.FrameRate,
+                Name = "FPS",
+                Unit = "FPS",
+                Format = "{name}: {value} {unit}",
+                Decimals = 0,
+                SortOrder = 0,
+            },
+            new()
+            {
+                Id = OnePercentLow,
+                Category = MetricCategory.FrameRate,
+                Name = "1% Low",
+                Unit = "FPS",
+                Format = "{name}: {value} {unit}",
+                Decimals = 0,
+                SortOrder = 1,
+            },
+            new()
+            {
+                Id = Frametime,
+                Category = MetricCategory.FrameRate,
+                Name = "Frametime",
+                Unit = "ms",
+                Format = "{name}: {value} {unit}",
+                Decimals = 1,
+                SortOrder = 2,
+            },
+            new()
+            {
+                Id = CpuUsage,
+                Category = MetricCategory.Cpu,
+                Name = "Usage",
+                Unit = "%",
+                Format = "{device} Usage: {value}{unit}",
+                Decimals = 0,
+                SortOrder = 0,
+            },
+            new()
+            {
+                Id = CpuTemperature,
+                Category = MetricCategory.Cpu,
+                Name = "Temperature",
+                Unit = "°C",
+                Format = "{device} Temp: {value}{unit}",
+                Decimals = 0,
+                SortOrder = 1,
+            },
+            new()
+            {
+                Id = GpuUsage,
+                Category = MetricCategory.Gpu,
+                Name = "Usage",
+                Unit = "%",
+                Format = "{device} Usage: {value}{unit}",
+                Decimals = 0,
+                SortOrder = 0,
+                IsPerDevice = true,
+            },
+            new()
+            {
+                Id = GpuTemperature,
+                Category = MetricCategory.Gpu,
+                Name = "Temperature",
+                Unit = "°C",
+                Format = "{device} Temp: {value}{unit}",
+                Decimals = 0,
+                SortOrder = 1,
+                IsPerDevice = true,
+            },
+            new()
+            {
+                Id = GpuVramUsage,
+                Category = MetricCategory.Gpu,
+                Name = "VRAM Usage",
+                Unit = "%",
+                Format = "{device} VRAM: {value}{unit}",
+                Decimals = 0,
+                SortOrder = 2,
+                IsPerDevice = true,
+            },
+            new()
+            {
+                Id = GpuVramUsed,
+                Category = MetricCategory.Gpu,
+                Name = "VRAM Used",
+                Unit = "GB",
+                Format = "{device} VRAM Used: {value} {unit}",
+                Decimals = 1,
+                IsVisibleByDefault = false,
+                SortOrder = 3,
+                IsPerDevice = true,
+            },
+            new()
+            {
+                Id = GpuVramTotal,
+                Category = MetricCategory.Gpu,
+                Name = "VRAM Total",
+                Unit = "GB",
+                Format = "{device} VRAM Total: {value} {unit}",
+                Decimals = 1,
+                IsVisibleByDefault = false,
+                SortOrder = 4,
+                IsPerDevice = true,
+            },
+            new()
+            {
+                Id = MemoryUsage,
+                Category = MetricCategory.Memory,
+                Name = "Usage",
+                Unit = "%",
+                Format = "{device} Usage: {value}{unit}",
+                Decimals = 0,
+                SortOrder = 0,
+            },
+            new()
+            {
+                Id = MemoryUsed,
+                Category = MetricCategory.Memory,
+                Name = "Used",
+                Unit = "GB",
+                Format = "{device} Used: {value} {unit}",
+                Decimals = 1,
+                IsVisibleByDefault = false,
+                SortOrder = 1,
+            },
+            new()
+            {
+                Id = MemoryTotal,
+                Category = MetricCategory.Memory,
+                Name = "Total",
+                Unit = "GB",
+                Format = "{device} Total: {value} {unit}",
+                Decimals = 1,
+                IsVisibleByDefault = false,
+                SortOrder = 2,
+            },
+            new()
+            {
+                Id = NetworkSend,
+                Category = MetricCategory.Network,
+                Name = "Send",
+                Unit = "Mbps",
+                Format = "↑ {value} {unit}",
+                Decimals = 1,
+                SortOrder = 0,
+            },
+            new()
+            {
+                Id = NetworkReceive,
+                Category = MetricCategory.Network,
+                Name = "Receive",
+                Unit = "Mbps",
+                Format = "↓ {value} {unit}",
+                Decimals = 1,
+                SortOrder = 1,
+            },
+            new()
+            {
+                Id = Ping,
+                Category = MetricCategory.Network,
+                Name = "Ping",
+                Unit = "ms",
+                Format = "{name}: {value} {unit}",
+                Decimals = 0,
+                SortOrder = 2,
+            },
+            new()
+            {
+                Id = PacketLoss,
+                Category = MetricCategory.Network,
+                Name = "Packet Loss",
+                Unit = "%",
+                Format = "{name}: {value}{unit}",
+                Decimals = 1,
+                SortOrder = 3,
+            },
         ]);
 
-    private static readonly IReadOnlyDictionary<string, MetricDefinition> ById =
-        new ReadOnlyDictionary<string, MetricDefinition>(
+    private static readonly ReadOnlyDictionary<MetricCategory,
+        MetricCategoryDefinition> CategoriesById =
+        new ReadOnlyDictionary<MetricCategory, MetricCategoryDefinition>(
+            CategoryDefinitions.ToDictionary(category => category.Id));
+
+    private static readonly ReadOnlyDictionary<string, MetricDefinition>
+        MetricsById = new ReadOnlyDictionary<string, MetricDefinition>(
             OrderedDefinitions.ToDictionary(
                 definition => definition.Id,
                 StringComparer.Ordinal));
 
     /// <summary>
-    /// Gets definitions in their stable declaration order.
+    /// Gets categories in stable display order.
+    /// </summary>
+    public static IReadOnlyList<MetricCategoryDefinition> Categories =>
+        OrderedCategories;
+
+    /// <summary>
+    /// Gets metrics in stable declaration order.
     /// </summary>
     public static IReadOnlyList<MetricDefinition> All => OrderedDefinitions;
+
+    /// <summary>
+    /// Gets category presentation metadata.
+    /// </summary>
+    public static MetricCategoryDefinition GetCategory(
+        MetricCategory category) =>
+        CategoriesById.TryGetValue(
+            category,
+            out MetricCategoryDefinition? definition)
+            ? definition
+            : throw new KeyNotFoundException(
+                $"Metric category '{category}' is not registered.");
 
     /// <summary>
     /// Looks up a definition by its base metric ID.
@@ -80,7 +301,7 @@ public static class MetricRegistry
     public static bool TryGet(
         string metricId,
         out MetricDefinition definition) =>
-        ById.TryGetValue(metricId, out definition!);
+        MetricsById.TryGetValue(metricId, out definition!);
 
     /// <summary>
     /// Gets a definition or throws when provider code uses an unknown ID.
@@ -90,30 +311,4 @@ public static class MetricRegistry
             ? definition
             : throw new KeyNotFoundException(
                 $"Metric '{metricId}' is not registered.");
-
-    /// <summary>
-    /// Returns the user-facing English label for a settings group.
-    /// </summary>
-    public static string GetGroupLabel(MetricGroup group) => group switch
-    {
-        MetricGroup.FrameRate => "Frame rate",
-        MetricGroup.Cpu => "CPU",
-        MetricGroup.Gpu => "GPU",
-        MetricGroup.Memory => "Memory",
-        MetricGroup.Network => "Network",
-        _ => group.ToString(),
-    };
-
-    /// <summary>
-    /// Returns the stable display order for a settings group.
-    /// </summary>
-    public static int GetGroupSortOrder(MetricGroup group) => group switch
-    {
-        MetricGroup.FrameRate => 0,
-        MetricGroup.Cpu => 100,
-        MetricGroup.Gpu => 200,
-        MetricGroup.Memory => 300,
-        MetricGroup.Network => 400,
-        _ => int.MaxValue,
-    };
 }

@@ -76,7 +76,7 @@ internal sealed class CollectorSession
             sessionCancellation.Token);
 
         await Task.WhenAny(publisher, disconnect).ConfigureAwait(false);
-        sessionCancellation.Cancel();
+        await sessionCancellation.CancelAsync().ConfigureAwait(false);
         snapshots.Writer.TryComplete();
         await IgnoreExpectedShutdownAsync(sampler).ConfigureAwait(false);
         await IgnoreExpectedShutdownAsync(publisher).ConfigureAwait(false);

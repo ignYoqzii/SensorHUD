@@ -7,17 +7,23 @@ using SensorHUD.Core.Telemetry;
 namespace SensorHUD.Collector.Sampling.Frames;
 
 /// <summary>
-/// Owns the ETW session, presentation timestamp retention, foreground-process
-/// preference, process-name cache, and capture status.
+/// Owns the DXG ETW session, presentation retention, process selection,
+/// process-name cache, and frame-capture status. The provider is filtered to
+/// presentation events at the ETW source to minimize graphics-workload cost.
 /// </summary>
 internal sealed class PresentEventMonitor : IDisposable
 {
+    private static readonly double RetentionWindowSeconds =
+        FrameCaptureDefaults.RetentionWindow.TotalSeconds;
+
     private readonly Lock _sync = new();
     private readonly Dictionary<int, Queue<double>> _presentsByProcess = [];
     private readonly Dictionary<int, string> _processNameCache = [];
+    private readonly List<int> _emptyProcessIds = new(4);
 
     private TraceEventSession? _session;
-    private string? _traceError = "Starting frame trace…";
+    private FrameCaptureState _traceState = FrameCaptureState.Starting;
+    private string? _traceError;
     private volatile bool _disposed;
 
     public PresentEventMonitor()
@@ -26,7 +32,7 @@ internal sealed class PresentEventMonitor : IDisposable
     }
 
     /// <summary>
-    /// Copies the current target's calculation window while holding the ETW
+    /// Copies the selected process's calculation window while holding the ETW
     /// state lock for the shortest practical time.
     /// </summary>
     public FrameCaptureWindow Capture()
@@ -35,50 +41,47 @@ internal sealed class PresentEventMonitor : IDisposable
         {
             double now = UtcSeconds(DateTime.UtcNow);
             double retentionCutoff =
-                now - FrameCaptureDefaults.RetentionWindow.TotalSeconds;
+                now - RetentionWindowSeconds;
             double calculationCutoff =
                 now - FrameCaptureDefaults.CalculationWindow.TotalSeconds;
             RemoveExpired(retentionCutoff);
 
-            if (_traceError is not null)
+            if (_traceState is
+                FrameCaptureState.Starting or
+                FrameCaptureState.Unavailable)
             {
-                FrameCaptureState state = _traceError.StartsWith(
-                    "Starting",
-                    StringComparison.Ordinal)
-                    ? FrameCaptureState.Starting
-                    : FrameCaptureState.Unavailable;
                 return new FrameCaptureWindow(
-                    state,
+                    _traceState,
                     null,
                     [],
-                    _traceError);
+                    _traceError ?? "Starting frame trace.");
             }
 
             int? processId = ChooseTargetProcess(calculationCutoff);
             if (processId is null)
             {
                 return new FrameCaptureWindow(
-                    FrameCaptureState.WaitingForGame,
+                    FrameCaptureState.WaitingForProcess,
                     null,
                     [],
-                    "No presenting game has been detected yet.");
+                    "No presenting process has been detected yet.");
             }
 
-            string? targetName =
+            string? processName =
                 _processNameCache.GetValueOrDefault(processId.Value);
-            if (string.IsNullOrWhiteSpace(targetName))
+            if (string.IsNullOrWhiteSpace(processName))
             {
-                targetName = $"PID {processId.Value}";
+                processName = $"PID {processId.Value}";
             }
 
-            double[] timestamps = _presentsByProcess[processId.Value]
-                .Where(timestamp => timestamp >= calculationCutoff)
-                .ToArray();
+            double[] timestamps = CopyRecent(
+                _presentsByProcess[processId.Value],
+                calculationCutoff);
             return new FrameCaptureWindow(
                 timestamps.Length < 2
                     ? FrameCaptureState.WarmingUp
                     : FrameCaptureState.Active,
-                targetName,
+                processName,
                 timestamps,
                 timestamps.Length < 2
                     ? "Waiting for enough frame samples."
@@ -102,14 +105,28 @@ internal sealed class PresentEventMonitor : IDisposable
                     StopOnDispose = true,
                 };
             _session = session;
+            if (_disposed)
+            {
+                return;
+            }
+
             session.Source.Dynamic.All += OnTraceEvent;
+            TraceEventProviderOptions options = new()
+            {
+                EventIDsToEnable =
+                [
+                    FrameCaptureDefaults.DxgKernelPresentEventId,
+                ],
+            };
             session.EnableProvider(
                 FrameCaptureDefaults.DxgKernelProvider,
                 TraceEventLevel.Verbose,
-                ulong.MaxValue);
+                ulong.MaxValue,
+                options);
 
             lock (_sync)
             {
+                _traceState = FrameCaptureState.WaitingForProcess;
                 _traceError = null;
             }
 
@@ -150,13 +167,18 @@ internal sealed class PresentEventMonitor : IDisposable
             }
 
             queue.Enqueue(timestamp);
+            double cutoff = timestamp - RetentionWindowSeconds;
+            while (queue.Count > 0 && queue.Peek() < cutoff)
+            {
+                queue.Dequeue();
+            }
         }
     }
 
     private void RemoveExpired(double cutoff)
     {
-        foreach ((int processId, Queue<double> queue) in
-                 _presentsByProcess.ToArray())
+        _emptyProcessIds.Clear();
+        foreach ((int processId, Queue<double> queue) in _presentsByProcess)
         {
             while (queue.Count > 0 && queue.Peek() < cutoff)
             {
@@ -165,9 +187,14 @@ internal sealed class PresentEventMonitor : IDisposable
 
             if (queue.Count == 0)
             {
-                _presentsByProcess.Remove(processId);
-                _processNameCache.Remove(processId);
+                _emptyProcessIds.Add(processId);
             }
+        }
+
+        foreach (int processId in _emptyProcessIds)
+        {
+            _presentsByProcess.Remove(processId);
+            _processNameCache.Remove(processId);
         }
     }
 
@@ -234,9 +261,43 @@ internal sealed class PresentEventMonitor : IDisposable
     }
 
     private static int CountRecent(
-        IEnumerable<double> timestamps,
-        double cutoff) => timestamps.Count(timestamp =>
-            timestamp >= cutoff);
+        Queue<double> timestamps,
+        double cutoff)
+    {
+        int count = 0;
+        foreach (double timestamp in timestamps)
+        {
+            if (timestamp >= cutoff)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static double[] CopyRecent(
+        Queue<double> timestamps,
+        double cutoff)
+    {
+        int count = CountRecent(timestamps, cutoff);
+        if (count == 0)
+        {
+            return [];
+        }
+
+        double[] result = new double[count];
+        int index = 0;
+        foreach (double timestamp in timestamps)
+        {
+            if (timestamp >= cutoff)
+            {
+                result[index++] = timestamp;
+            }
+        }
+
+        return result;
+    }
 
     private static int GetForegroundProcessId()
     {
@@ -256,6 +317,7 @@ internal sealed class PresentEventMonitor : IDisposable
     {
         lock (_sync)
         {
+            _traceState = FrameCaptureState.Unavailable;
             _traceError = error;
         }
     }
@@ -265,9 +327,9 @@ internal sealed class PresentEventMonitor : IDisposable
 }
 
 /// <summary>
-/// Immutable ETW capture passed to the calculation layer.
+/// Immutable ETW capture passed to the frame calculation layer.
 /// </summary>
-internal sealed record FrameCaptureWindow(
+internal readonly record struct FrameCaptureWindow(
     FrameCaptureState State,
     string? TargetProcess,
     double[] PresentationTimestamps,

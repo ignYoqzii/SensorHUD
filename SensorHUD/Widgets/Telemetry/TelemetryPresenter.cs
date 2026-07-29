@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using SensorHUD.Core.Metrics;
 using SensorHUD.Core.Settings;
 using SensorHUD.Core.Telemetry;
@@ -23,8 +22,8 @@ internal static class TelemetryPresenter
             new(StringComparer.Ordinal);
         Dictionary<(string MetricId, string DeviceId), MetricReading>
             deviceReadings = [];
-        Dictionary<string, string?> devices =
-            new(StringComparer.Ordinal);
+        Dictionary<(MetricCategory Category, string DeviceId), string?>
+            devices = [];
 
         foreach (MetricReading reading in snapshot?.Readings ?? [])
         {
@@ -46,7 +45,8 @@ internal static class TelemetryPresenter
                 // one instance without crashing the entire overlay.
                 deviceReadings[(reading.MetricId, reading.DeviceId)] =
                     reading;
-                devices[reading.DeviceId] = reading.DeviceName;
+                devices[(definition.Category, reading.DeviceId)] =
+                    reading.DeviceName;
             }
             else
             {
@@ -54,13 +54,19 @@ internal static class TelemetryPresenter
             }
         }
 
-        List<PresentedMetric> metrics = [];
+        List<PresentedMetric> metrics = new(MetricRegistry.All.Count);
         foreach (MetricDefinition definition in MetricRegistry.All)
         {
             if (definition.IsPerDevice)
             {
-                foreach ((string deviceId, string? deviceName) in devices)
+                foreach (((MetricCategory category, string deviceId),
+                         string? deviceName) in devices)
                 {
+                    if (category != definition.Category)
+                    {
+                        continue;
+                    }
+
                     if (!deviceReadings.TryGetValue(
                             (definition.Id, deviceId),
                             out MetricReading? reading))
@@ -127,12 +133,14 @@ internal static class TelemetryPresenter
 
     private static int CompareMetrics(PresentedMetric left, PresentedMetric right)
     {
-        int group = MetricRegistry.GetGroupSortOrder(left.Definition.Group)
+        int category = MetricRegistry.GetCategory(
+                left.Definition.Category).SortOrder
             .CompareTo(
-                MetricRegistry.GetGroupSortOrder(right.Definition.Group));
-        if (group != 0)
+                MetricRegistry.GetCategory(
+                    right.Definition.Category).SortOrder);
+        if (category != 0)
         {
-            return group;
+            return category;
         }
 
         int device = string.Compare(

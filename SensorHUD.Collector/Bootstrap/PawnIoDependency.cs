@@ -52,7 +52,7 @@ internal static class PawnIoDependency
                 throw new InvalidOperationException(
                     "PawnIO installer did not start.");
 
-            await process.WaitForExitAsync();
+            await process.WaitForExitAsync().ConfigureAwait(false);
             if (process.ExitCode is not 0 and not 3010)
             {
                 return PawnIoResult.Failed(

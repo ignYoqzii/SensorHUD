@@ -16,7 +16,7 @@ public sealed class CollectorStatusViewModel : ObservableObject
     private string _lastSnapshot = "Waiting";
     private string _administrator = "Unknown";
     private string _pawnIo = "Unknown";
-    private string _frames = "Waiting";
+    private string _foregroundProcess = "Waiting";
     private string _processor = "Not detected";
     private string _graphics = "Not detected";
     private string? _error;
@@ -45,10 +45,13 @@ public sealed class CollectorStatusViewModel : ObservableObject
         private set => SetProperty(ref _pawnIo, value);
     }
 
-    public string Frames
+    /// <summary>
+    /// Gets the process selected from current presentation activity.
+    /// </summary>
+    public string ForegroundProcess
     {
-        get => _frames;
-        private set => SetProperty(ref _frames, value);
+        get => _foregroundProcess;
+        private set => SetProperty(ref _foregroundProcess, value);
     }
 
     public string Processor
@@ -70,16 +73,15 @@ public sealed class CollectorStatusViewModel : ObservableObject
         {
             if (SetProperty(ref _error, value))
             {
-                Notify(nameof(HasError));
                 Notify(nameof(ErrorVisibility));
             }
         }
     }
 
-    public bool HasError => !string.IsNullOrWhiteSpace(Error);
-
     public Visibility ErrorVisibility =>
-        HasError ? Visibility.Visible : Visibility.Collapsed;
+        string.IsNullOrWhiteSpace(Error)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
 
     internal void Update(
         CollectorConnectionStatus connection,
@@ -104,7 +106,7 @@ public sealed class CollectorStatusViewModel : ObservableObject
             .ToString("T");
         Administrator = snapshot.Health.IsAdministrator ? "Yes" : "No";
         PawnIo = FormatPawnIo(snapshot.Health);
-        Frames = FormatFrames(snapshot.Health);
+        ForegroundProcess = FormatForegroundProcess(snapshot.Health);
         Processor = snapshot.Readings
             .FirstOrDefault(reading =>
                 reading.MetricId == MetricRegistry.CpuUsage)
@@ -134,14 +136,15 @@ public sealed class CollectorStatusViewModel : ObservableObject
             : $"{state} ({health.PawnIoVersion})";
     }
 
-    private static string FormatFrames(CollectorHealth health) =>
+    private static string FormatForegroundProcess(CollectorHealth health) =>
         health.FrameCaptureState switch
         {
-            FrameCaptureState.WaitingForGame => "Waiting for a game",
+            FrameCaptureState.WaitingForProcess =>
+                "Waiting for a presenting process",
             FrameCaptureState.WarmingUp => "Warming up",
             FrameCaptureState.Active when
-                !string.IsNullOrWhiteSpace(health.FrameTargetProcess) =>
-                $"Active - {health.FrameTargetProcess}",
+                !string.IsNullOrWhiteSpace(health.ForegroundProcess) =>
+                health.ForegroundProcess,
             FrameCaptureState.Active => "Active",
             FrameCaptureState.Unavailable => "Unavailable",
             _ => "Starting",

@@ -18,8 +18,8 @@ public static class SettingsDefaults
     public const double FontSize = 18;
     public const double MinimumFontSize = 8;
     public const double MaximumFontSize = 72;
-    public const int MinimumPrecision = 0;
-    public const int MaximumPrecision = 2;
+    public const int MinimumDecimals = 0;
+    public const int MaximumDecimals = 2;
     public const string FontColor = "#FFFFFFFF";
 
     public static readonly TimeSpan SaveDebounce =

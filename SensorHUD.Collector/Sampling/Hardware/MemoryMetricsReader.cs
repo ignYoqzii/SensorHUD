@@ -13,12 +13,11 @@ internal static class MemoryMetricsReader
     private const double BytesPerGigabyte = 1024d * 1024d * 1024d;
     private const string DeviceName = "System Memory";
 
-    public static void Read(
-        ICollection<MetricReading> readings,
-        string? hardwareAccessError)
+    public static void Read(ICollection<MetricReading> readings)
     {
-        NativeMethods.MemoryStatus memory = new();
-        if (!NativeMethods.GlobalMemoryStatusEx(memory) ||
+        NativeMethods.MemoryStatus memory =
+            NativeMethods.MemoryStatus.Create();
+        if (!NativeMethods.GlobalMemoryStatusEx(ref memory) ||
             memory.TotalPhys == 0)
         {
             const string error =
@@ -33,7 +32,7 @@ internal static class MemoryMetricsReader
                     metricId,
                     DeviceName,
                     error,
-                    hardwareAccessError));
+                    hardwareAccessError: null));
         }
 
         readings.Add(HardwareReading.Value(

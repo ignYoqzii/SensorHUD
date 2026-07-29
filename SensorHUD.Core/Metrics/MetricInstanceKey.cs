@@ -40,7 +40,11 @@ public static class MetricInstanceKey
         out string metricId,
         out string? deviceId)
     {
-        int separatorIndex = key.IndexOf(Separator);
+        ArgumentNullException.ThrowIfNull(key);
+
+        int separatorIndex = key.IndexOf(
+            Separator,
+            StringComparison.Ordinal);
         if (separatorIndex <= 0 || separatorIndex == key.Length - 1)
         {
             metricId = key;
