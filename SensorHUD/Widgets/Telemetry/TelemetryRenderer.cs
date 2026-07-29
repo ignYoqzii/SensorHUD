@@ -16,22 +16,14 @@ namespace SensorHUD.Widgets.Telemetry;
 /// Owns metric controls, typed runs, separators, tooltips, and structure
 /// caching. Ordinary samples update existing run text in place.
 /// </summary>
-internal sealed class TelemetryRenderer
+internal sealed class TelemetryRenderer(
+    ItemsControl verticalItems,
+    TextBlock horizontalText)
 {
-    private readonly ItemsControl _verticalItems;
-    private readonly TextBlock _horizontalText;
     private readonly Dictionary<string, RenderNode> _nodes = [];
     private readonly List<string> _renderedKeys = [];
 
     private WidgetSettings? _renderedSettings;
-
-    public TelemetryRenderer(
-        ItemsControl verticalItems,
-        TextBlock horizontalText)
-    {
-        _verticalItems = verticalItems;
-        _horizontalText = horizontalText;
-    }
 
     public void Render(
         TelemetryDisplayModel model,
@@ -48,9 +40,9 @@ internal sealed class TelemetryRenderer
 
         UpdateTooltips(model, settings.Layout);
         bool horizontal = settings.Layout == WidgetLayout.Horizontal;
-        _horizontalText.Visibility =
+        horizontalText.Visibility =
             horizontal ? Visibility.Visible : Visibility.Collapsed;
-        _verticalItems.Visibility =
+        verticalItems.Visibility =
             horizontal ? Visibility.Collapsed : Visibility.Visible;
     }
 
@@ -66,9 +58,9 @@ internal sealed class TelemetryRenderer
             _renderedKeys.Add(metric.Key);
         }
 
-        _verticalItems.Items.Clear();
-        _horizontalText.Inlines.Clear();
-        ApplyTextStyle(_horizontalText, settings.Appearance);
+        verticalItems.Items.Clear();
+        horizontalText.Inlines.Clear();
+        ApplyTextStyle(horizontalText, settings.Appearance);
 
         if (settings.Layout == WidgetLayout.Horizontal)
         {
@@ -89,13 +81,13 @@ internal sealed class TelemetryRenderer
         {
             if (!first)
             {
-                _horizontalText.Inlines.Add(new Run
+                horizontalText.Inlines.Add(new Run
                 {
                     Text = FormatSeparator(settings.HorizontalSeparator),
                 });
             }
 
-            RenderNode node = CreateNode(_horizontalText, metric, settings);
+            RenderNode node = CreateNode(horizontalText, metric, settings);
             _nodes.Add(metric.Key, node);
             first = false;
         }
@@ -123,7 +115,7 @@ internal sealed class TelemetryRenderer
                     Color.FromArgb(65, 255, 255, 255)),
                 BorderThickness = new Thickness(0, 0, 0, 1),
             };
-            _verticalItems.Items.Add(item);
+            verticalItems.Items.Add(item);
             _nodes.Add(metric.Key, CreateNode(text, metric, settings));
         }
     }
@@ -182,7 +174,7 @@ internal sealed class TelemetryRenderer
             }
 
             ToolTipService.SetToolTip(
-                _horizontalText,
+                horizontalText,
                 errors is null
                     ? null
                     : string.Join(Environment.NewLine, errors));

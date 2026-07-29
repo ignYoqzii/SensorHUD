@@ -10,19 +10,10 @@ namespace SensorHUD.Collector.Hosting;
 /// Validates and serves one frontend connection. Sampling and publishing use a
 /// capacity-one drop-oldest channel so a slow widget cannot create backlog.
 /// </summary>
-internal sealed class CollectorSession
+internal sealed class CollectorSession(
+    TelemetrySampler sampler,
+    NamedPipeServerStream pipe)
 {
-    private readonly TelemetrySampler _sampler;
-    private readonly NamedPipeServerStream _pipe;
-
-    public CollectorSession(
-        TelemetrySampler sampler,
-        NamedPipeServerStream pipe)
-    {
-        _sampler = sampler;
-        _pipe = pipe;
-    }
-
     public async Task RunAsync(CancellationToken hostCancellation)
     {
         CollectorMessage? hello = await ReadHandshakeAsync(
@@ -40,7 +31,7 @@ internal sealed class CollectorSession
         try
         {
             await PipeMessageSerializer.WriteAsync(
-                _pipe,
+                pipe,
                 new CollectorMessage
                 {
                     Kind = CollectorMessageKind.ServerHello,
@@ -93,7 +84,7 @@ internal sealed class CollectorSession
         {
             do
             {
-                _ = writer.TryWrite(_sampler.Sample());
+                _ = writer.TryWrite(sampler.Sample());
             }
             while (await timer.WaitForNextTickAsync(cancellationToken)
                 .ConfigureAwait(false));
@@ -117,7 +108,7 @@ internal sealed class CollectorSession
             reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
             await PipeMessageSerializer.WriteAsync(
-                _pipe,
+                pipe,
                 new CollectorMessage
                 {
                     Kind = CollectorMessageKind.Snapshot,
@@ -133,7 +124,7 @@ internal sealed class CollectorSession
     {
         CollectorMessage? unexpected =
             await PipeMessageSerializer.ReadAsync(
-                _pipe,
+                pipe,
                 cancellationToken).ConfigureAwait(false);
         if (unexpected is not null)
         {
@@ -152,7 +143,7 @@ internal sealed class CollectorSession
         try
         {
             return await PipeMessageSerializer.ReadAsync(
-                _pipe,
+                pipe,
                 handshake.Token).ConfigureAwait(false);
         }
         catch (Exception exception)
@@ -173,7 +164,7 @@ internal sealed class CollectorSession
         try
         {
             await PipeMessageSerializer.WriteAsync(
-                _pipe,
+                pipe,
                 new CollectorMessage
                 {
                     Kind = CollectorMessageKind.Error,

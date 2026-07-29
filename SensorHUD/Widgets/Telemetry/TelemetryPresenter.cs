@@ -98,7 +98,7 @@ internal static class TelemetryPresenter
     }
 
     private static void AddMetric(
-        ICollection<PresentedMetric> target,
+        List<PresentedMetric> target,
         MetricDefinition definition,
         MetricReading? reading,
         WidgetSettings settings)

@@ -9,19 +9,10 @@ namespace SensorHUD.Collector.Hosting;
 /// Owns the collector process lifetime and accepts validated frontend
 /// connections. Per-connection work belongs to <see cref="CollectorSession"/>.
 /// </summary>
-internal sealed class CollectorHost
+internal sealed class CollectorHost(
+    TelemetrySampler sampler,
+    SecurePipeServer pipeServer)
 {
-    private readonly TelemetrySampler _sampler;
-    private readonly SecurePipeServer _pipeServer;
-
-    public CollectorHost(
-        TelemetrySampler sampler,
-        SecurePipeServer pipeServer)
-    {
-        _sampler = sampler;
-        _pipeServer = pipeServer;
-    }
-
     public async Task RunAsync(
         CancellationToken cancellationToken = default)
     {
@@ -29,7 +20,7 @@ internal sealed class CollectorHost
             CollectorProtocol.InitialClientTimeout;
         while (!cancellationToken.IsCancellationRequested)
         {
-            using NamedPipeServerStream pipe = _pipeServer.Create();
+            using NamedPipeServerStream pipe = pipeServer.Create();
             if (!await WaitForConnectionAsync(
                     pipe,
                     connectionWindow,
@@ -38,14 +29,14 @@ internal sealed class CollectorHost
                 return;
             }
 
-            if (!_pipeServer.IsExpectedClient(pipe))
+            if (!pipeServer.IsExpectedClient(pipe))
             {
                 // The World ACL is required by AppContainer token semantics;
                 // runtime package validation rejects ordinary Win32 clients.
                 continue;
             }
 
-            CollectorSession session = new(_sampler, pipe);
+            CollectorSession session = new(sampler, pipe);
             await session.RunAsync(cancellationToken).ConfigureAwait(false);
 
             // Brief Game Bar suspension or recreation may reconnect. When no

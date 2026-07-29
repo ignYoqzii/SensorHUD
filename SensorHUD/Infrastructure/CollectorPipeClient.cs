@@ -12,7 +12,7 @@ namespace SensorHUD.Infrastructure;
 /// Owns exactly one named-pipe connection, including handshake and validated
 /// message reads. Reconnection policy belongs to <see cref="CollectorConnection"/>.
 /// </summary>
-internal sealed class CollectorPipeClient : IDisposable
+internal sealed partial class CollectorPipeClient : IDisposable
 {
     private readonly NamedPipeClientStream _pipe = new(
         ".",

@@ -10,19 +10,13 @@ namespace SensorHUD.Widgets.Settings;
 /// Publishes validated edits immediately, orders debounced atomic writes, and
 /// flushes the most recent unsaved model when the settings widget closes.
 /// </summary>
-internal sealed class SettingsAutoSaver : IDisposable
+internal sealed partial class SettingsAutoSaver(WidgetSettingsStore store) : IDisposable
 {
-    private readonly WidgetSettingsStore _store;
-    private readonly object _sync = new();
+    private readonly Lock _sync = new();
 
     private CancellationTokenSource? _delayCancellation;
     private WidgetSettings? _pendingSettings;
     private Task _pendingSave = Task.CompletedTask;
-
-    public SettingsAutoSaver(WidgetSettingsStore store)
-    {
-        _store = store;
-    }
 
     public void Schedule(WidgetSettings settings)
     {
@@ -72,7 +66,7 @@ internal sealed class SettingsAutoSaver : IDisposable
         {
             try
             {
-                await _store.SaveAsync(pending);
+                await store.SaveAsync(pending);
             }
             catch (Exception exception)
                 when (exception is System.IO.IOException or
@@ -112,7 +106,7 @@ internal sealed class SettingsAutoSaver : IDisposable
             await Task.Delay(
                 SettingsDefaults.SaveDebounce,
                 cancellationToken);
-            await _store.SaveAsync(settings);
+            await store.SaveAsync(settings);
             lock (_sync)
             {
                 if (ReferenceEquals(_pendingSettings, settings))

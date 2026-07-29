@@ -33,20 +33,15 @@ internal sealed record CollectorConnectionStatus(
 /// </summary>
 internal sealed class CollectorConnection
 {
-    private readonly CollectorLauncher _launcher;
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
 
     private CancellationTokenSource? _runCancellation;
     private Task? _runTask;
     private CollectorPipeClient? _activeClient;
+
     private TelemetrySnapshot? _latestSnapshot;
     private CollectorConnectionStatus _status =
         new(CollectorConnectionState.Stopped);
-
-    public CollectorConnection(CollectorLauncher launcher)
-    {
-        _launcher = launcher;
-    }
 
     /// <summary>
     /// Raised on a background context. XAML subscribers must dispatch.
@@ -187,7 +182,7 @@ internal sealed class CollectorConnection
                 if (!launchAttempted)
                 {
                     launchAttempted = true;
-                    await _launcher.TryLaunchAsync().ConfigureAwait(false);
+                    await CollectorLauncher.TryLaunchAsync().ConfigureAwait(false);
                 }
             }
             finally

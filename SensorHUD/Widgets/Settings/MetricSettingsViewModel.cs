@@ -9,7 +9,7 @@ namespace SensorHUD.Widgets.Settings;
 /// <summary>
 /// Bindable editor state for one global or device-specific metric.
 /// </summary>
-public sealed class MetricSettingsViewModel : ObservableObject
+public sealed partial class MetricSettingsViewModel : ObservableObject
 {
     private bool _isVisible;
     private string _format;

@@ -1,6 +1,4 @@
 using System;
-using System.Linq;
-using SensorHUD.Core.Metrics;
 using SensorHUD.Core.Telemetry;
 using SensorHUD.Infrastructure;
 using Windows.UI.Xaml;
@@ -10,15 +8,13 @@ namespace SensorHUD.Widgets.Settings;
 /// <summary>
 /// Read-only collector status presented by the settings widget.
 /// </summary>
-public sealed class CollectorStatusViewModel : ObservableObject
+public sealed partial class CollectorStatusViewModel : ObservableObject
 {
     private string _connection = "Stopped";
     private string _lastSnapshot = "Waiting";
     private string _administrator = "Unknown";
     private string _pawnIo = "Unknown";
     private string _foregroundProcess = "Waiting";
-    private string _processor = "Not detected";
-    private string _graphics = "Not detected";
     private string? _error;
 
     public string Connection
@@ -52,18 +48,6 @@ public sealed class CollectorStatusViewModel : ObservableObject
     {
         get => _foregroundProcess;
         private set => SetProperty(ref _foregroundProcess, value);
-    }
-
-    public string Processor
-    {
-        get => _processor;
-        private set => SetProperty(ref _processor, value);
-    }
-
-    public string Graphics
-    {
-        get => _graphics;
-        private set => SetProperty(ref _graphics, value);
     }
 
     public string? Error
@@ -107,20 +91,6 @@ public sealed class CollectorStatusViewModel : ObservableObject
         Administrator = snapshot.Health.IsAdministrator ? "Yes" : "No";
         PawnIo = FormatPawnIo(snapshot.Health);
         ForegroundProcess = FormatForegroundProcess(snapshot.Health);
-        Processor = snapshot.Readings
-            .FirstOrDefault(reading =>
-                reading.MetricId == MetricRegistry.CpuUsage)
-            ?.DeviceName ?? "Not detected";
-        string[] gpuNames = snapshot.Readings
-            .Where(reading =>
-                reading.MetricId == MetricRegistry.GpuUsage &&
-                !string.IsNullOrWhiteSpace(reading.DeviceName))
-            .Select(reading => reading.DeviceName!)
-            .Distinct(StringComparer.CurrentCultureIgnoreCase)
-            .ToArray();
-        Graphics = gpuNames.Length == 0
-            ? "Not detected"
-            : string.Join(", ", gpuNames);
     }
 
     private static string FormatPawnIo(CollectorHealth health)

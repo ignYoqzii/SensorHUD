@@ -4,19 +4,21 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Background="Transparent">
 
-    <!-- Game Bar supplies the chrome; this page owns only overlay content. -->
-    <Border x:Name="BackgroundPanel"
-            Padding="4,0,4,4"
-            CornerRadius="6">
+    <!--  Game Bar supplies the chrome; this page owns only overlay content.  -->
+    <Border
+        x:Name="BackgroundPanel"
+        Padding="4,0,4,4"
+        CornerRadius="6">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                          VerticalScrollBarVisibility="Auto"
-                          VerticalContentAlignment="Top">
+            <ScrollViewer
+                VerticalContentAlignment="Top"
+                HorizontalScrollBarVisibility="Disabled"
+                VerticalScrollBarVisibility="Auto">
                 <Grid VerticalAlignment="Top">
                     <ItemsControl x:Name="VerticalItems">
                         <ItemsControl.ItemsPanel>
@@ -25,22 +27,24 @@
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                     </ItemsControl>
-                    <TextBlock x:Name="HorizontalText"
-                               Visibility="Collapsed"
-                               TextWrapping="Wrap"
-                               VerticalAlignment="Top" />
+                    <TextBlock
+                        x:Name="HorizontalText"
+                        VerticalAlignment="Top"
+                        TextWrapping="Wrap"
+                        Visibility="Collapsed" />
                 </Grid>
             </ScrollViewer>
 
-            <TextBlock x:Name="StatusText"
-                       Grid.Row="1"
-                       VerticalAlignment="Center"
-                       Margin="2,8,2,0"
-                       FontSize="15"
-                       FontWeight="Medium"
-                       Opacity="0.72"
-                       TextWrapping="Wrap"
-                       Visibility="Collapsed" />
+            <TextBlock
+                x:Name="StatusText"
+                Grid.Row="1"
+                Margin="2,8,2,0"
+                VerticalAlignment="Center"
+                FontSize="15"
+                FontWeight="Medium"
+                Opacity="0.72"
+                TextWrapping="Wrap"
+                Visibility="Collapsed" />
         </Grid>
     </Border>
 </Page>

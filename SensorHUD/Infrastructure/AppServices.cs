@@ -9,8 +9,7 @@ namespace SensorHUD.Infrastructure;
 /// </summary>
 internal static class AppServices
 {
-    public static CollectorConnection Collector { get; } = new(
-        new CollectorLauncher());
+    public static CollectorConnection Collector { get; } = new();
 
     public static WidgetSettingsStore Settings { get; } = new();
 

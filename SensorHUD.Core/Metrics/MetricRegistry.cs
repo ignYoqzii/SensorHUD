@@ -73,9 +73,7 @@ public static class MetricRegistry
 
     private static readonly IReadOnlyList<MetricCategoryDefinition>
         OrderedCategories = new ReadOnlyCollection<MetricCategoryDefinition>(
-            CategoryDefinitions
-                .OrderBy(category => category.SortOrder)
-                .ToArray());
+            [.. CategoryDefinitions.OrderBy(category => category.SortOrder)]);
 
     private static readonly IReadOnlyList<MetricDefinition>
         OrderedDefinitions = new ReadOnlyCollection<MetricDefinition>(
@@ -263,11 +261,11 @@ public static class MetricRegistry
 
     private static readonly ReadOnlyDictionary<MetricCategory,
         MetricCategoryDefinition> CategoriesById =
-        new ReadOnlyDictionary<MetricCategory, MetricCategoryDefinition>(
+        new(
             CategoryDefinitions.ToDictionary(category => category.Id));
 
     private static readonly ReadOnlyDictionary<string, MetricDefinition>
-        MetricsById = new ReadOnlyDictionary<string, MetricDefinition>(
+        MetricsById = new(
             OrderedDefinitions.ToDictionary(
                 definition => definition.Id,
                 StringComparer.Ordinal));

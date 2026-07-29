@@ -21,8 +21,8 @@ internal sealed class InternetPathProbe : IDisposable
 
     private readonly Lock _sync = new();
     private readonly ProbeTargetState[] _targets =
-        ProbeAddresses.Select(address =>
-            new ProbeTargetState(address, MaximumResults)).ToArray();
+        [.. ProbeAddresses.Select(address =>
+            new ProbeTargetState(address, MaximumResults))];
 
     private int _selectedTargetIndex = -1;
     private int _selectionFailures;
@@ -125,10 +125,9 @@ internal sealed class InternetPathProbe : IDisposable
         TargetProbeResult[] results;
         if (selectTarget)
         {
-            Task<TargetProbeResult>[] probes = _targets
+            Task<TargetProbeResult>[] probes = [.. _targets
                 .Select((target, index) =>
-                    ProbeTargetAsync(index, target))
-                .ToArray();
+                    ProbeTargetAsync(index, target))];
             results = await Task.WhenAll(probes).ConfigureAwait(false);
         }
         else
@@ -213,24 +212,15 @@ internal sealed class InternetPathProbe : IDisposable
         }
     }
 
-    private sealed class ProbeTargetState : IDisposable
+    private sealed class ProbeTargetState(
+        IPAddress address,
+        int maximumResults) : IDisposable
     {
-        private readonly int _maximumResults;
-
-        public ProbeTargetState(
-            IPAddress address,
-            int maximumResults)
-        {
-            Address = address;
-            _maximumResults = maximumResults;
-            Results = new Queue<ProbeResult>(maximumResults);
-        }
-
-        public IPAddress Address { get; }
+        public IPAddress Address { get; } = address;
 
         public Ping Ping { get; } = new();
 
-        public Queue<ProbeResult> Results { get; }
+        public Queue<ProbeResult> Results { get; } = new Queue<ProbeResult>(maximumResults);
 
         public int ConsecutiveFailures { get; private set; }
 
@@ -247,7 +237,7 @@ internal sealed class InternetPathProbe : IDisposable
                 RoundtripTotal += result.RoundtripMilliseconds;
             }
 
-            while (Results.Count > _maximumResults)
+            while (Results.Count > maximumResults)
             {
                 ProbeResult removed = Results.Dequeue();
                 if (removed.IsSuccess)

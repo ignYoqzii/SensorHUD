@@ -11,7 +11,7 @@ namespace SensorHUD.Widgets.Settings;
 /// <summary>
 /// Bindable typography and background settings.
 /// </summary>
-public sealed class AppearanceSettingsViewModel : ObservableObject
+public sealed partial class AppearanceSettingsViewModel : ObservableObject
 {
     private static readonly WidgetFontWeight[] FontWeightChoices =
         Enum.GetValues<WidgetFontWeight>();

@@ -16,7 +16,7 @@ namespace SensorHUD.Collector.Transport;
 /// behind every accepted connection. Messages cross into a process that may be
 /// elevated, so the ACL and runtime identity check are both mandatory.
 /// </summary>
-internal sealed class SecurePipeServer
+internal sealed class SecurePipeServer(string packageFamilyName)
 {
     private const int PipeBufferBytes = 64 * 1024;
     private const int MaximumPackageFamilyNameLength = 64;
@@ -26,18 +26,11 @@ internal sealed class SecurePipeServer
     private const int KernelObject = 6;
     private const string LowIntegrityLabelSddl = "S:(ML;;NW;;;LW)";
 
-    private readonly PipeSecurity _security;
-    private readonly string _packageFamilyName;
-
-    public SecurePipeServer(string packageFamilyName)
-    {
-        _packageFamilyName = packageFamilyName;
-        _security = CreateSecurity(packageFamilyName);
-    }
+    private readonly PipeSecurity _security = CreateSecurity(packageFamilyName);
 
     public NamedPipeServerStream Create()
     {
-        return Create(GetPackagePipeName(_packageFamilyName));
+        return Create(GetPackagePipeName(packageFamilyName));
     }
 
     private NamedPipeServerStream Create(string pipeName)
@@ -105,7 +98,7 @@ internal sealed class SecurePipeServer
         bool matches = result == 0 &&
             string.Equals(
                 familyName.ToString(),
-                _packageFamilyName,
+                packageFamilyName,
                 StringComparison.Ordinal);
         return matches;
     }

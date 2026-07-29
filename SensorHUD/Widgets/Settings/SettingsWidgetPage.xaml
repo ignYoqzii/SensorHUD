@@ -70,8 +70,6 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <TextBlock Text="Collector"
                                        Style="{StaticResource StatusLabelStyle}" />
@@ -97,16 +95,6 @@
                                        Style="{StaticResource StatusLabelStyle}" />
                             <TextBlock Grid.Row="4" Grid.Column="1"
                                        Text="{x:Bind ViewModel.Status.ForegroundProcess, Mode=OneWay}"
-                                       Style="{StaticResource StatusValueStyle}" />
-                            <TextBlock Grid.Row="5" Text="Processor"
-                                       Style="{StaticResource StatusLabelStyle}" />
-                            <TextBlock Grid.Row="5" Grid.Column="1"
-                                       Text="{x:Bind ViewModel.Status.Processor, Mode=OneWay}"
-                                       Style="{StaticResource StatusValueStyle}" />
-                            <TextBlock Grid.Row="6" Text="Graphics"
-                                       Style="{StaticResource StatusLabelStyle}" />
-                            <TextBlock Grid.Row="6" Grid.Column="1"
-                                       Text="{x:Bind ViewModel.Status.Graphics, Mode=OneWay}"
                                        Style="{StaticResource StatusValueStyle}" />
                         </Grid>
                         <Border Padding="12"

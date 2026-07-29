@@ -50,7 +50,9 @@ public sealed class SettingsPageViewModel
 
     public IReadOnlyList<MetricCategoryViewModel> MetricCategories { get; }
 
+#pragma warning disable CA1822 // Mark members as static
     public string VersionText
+#pragma warning restore CA1822 // Mark members as static
     {
         get
         {
@@ -59,7 +61,9 @@ public sealed class SettingsPageViewModel
         }
     }
 
+#pragma warning disable CA1822 // Mark members as static
     public string CopyrightText => $"© {DateTime.Now.Year} yoqzii - All rights reserved.";
+#pragma warning restore CA1822 // Mark members as static
 
     internal WidgetSettings ToSettings()
     {
@@ -77,7 +81,7 @@ public sealed class SettingsPageViewModel
         return result;
     }
 
-    private IReadOnlyList<MetricCategoryViewModel> CreateMetricCategories(
+    private List<MetricCategoryViewModel> CreateMetricCategories(
         TelemetrySnapshot? snapshot)
     {
         List<MetricCategoryViewModel> categories =
@@ -85,28 +89,22 @@ public sealed class SettingsPageViewModel
         foreach (MetricCategoryDefinition category in
                  MetricRegistry.Categories)
         {
-            MetricDefinition[] definitions = MetricRegistry.All
+            MetricDefinition[] definitions = [.. MetricRegistry.All
                 .Where(definition =>
                     definition.Category == category.Id)
-                .OrderBy(definition => definition.SortOrder)
-                .ToArray();
-            MetricDefinition[] globalDefinitions = definitions
-                .Where(definition => !definition.IsPerDevice)
-                .ToArray();
+                .OrderBy(definition => definition.SortOrder)];
+            MetricDefinition[] globalDefinitions = [.. definitions.Where(definition => !definition.IsPerDevice)];
             if (globalDefinitions.Length > 0)
             {
                 categories.Add(new MetricCategoryViewModel(
                     category.Name,
                     category.Description,
-                    globalDefinitions
+                    (List<MetricSettingsViewModel>)[.. globalDefinitions
                         .Select(definition =>
-                            CreateMetric(definition, null))
-                        .ToList()));
+                            CreateMetric(definition, null))]));
             }
 
-            MetricDefinition[] deviceDefinitions = definitions
-                .Where(definition => definition.IsPerDevice)
-                .ToArray();
+            MetricDefinition[] deviceDefinitions = [.. definitions.Where(definition => definition.IsPerDevice)];
             if (deviceDefinitions.Length > 0)
             {
                 AddDeviceCategories(
@@ -124,7 +122,7 @@ public sealed class SettingsPageViewModel
     /// Adds one category card per detected device for per-device metrics.
     /// </summary>
     private void AddDeviceCategories(
-        ICollection<MetricCategoryViewModel> categories,
+        List<MetricCategoryViewModel> categories,
         MetricCategoryDefinition category,
         IReadOnlyList<MetricDefinition> definitions,
         TelemetrySnapshot? snapshot)
@@ -148,10 +146,9 @@ public sealed class SettingsPageViewModel
                 device.First().DeviceName)
                 ? category.Name
                 : device.First().DeviceName!;
-            List<MetricSettingsViewModel> metrics = definitions
+            List<MetricSettingsViewModel> metrics = [.. definitions
                 .Select(definition =>
-                    CreateMetric(definition, device.Key))
-                .ToList();
+                    CreateMetric(definition, device.Key))];
             categories.Add(new MetricCategoryViewModel(
                 $"{category.Name} - {deviceName}",
                 category.Description,
