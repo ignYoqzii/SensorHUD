@@ -18,7 +18,7 @@ internal sealed class FrameMetricsProvider :
     public FrameProviderStatus Status { get; private set; } =
         new(FrameCaptureState.Starting);
 
-    public IReadOnlyList<MetricReading> Sample()
+    public void Sample(ICollection<MetricReading> readings)
     {
         FrameCaptureWindow capture = _monitor.Capture();
         Status = new FrameProviderStatus(
@@ -32,31 +32,40 @@ internal sealed class FrameMetricsProvider :
                 capture.PresentationTimestamps,
                 out FrameStatisticsResult statistics))
         {
-            return Unavailable(
+            AddUnavailable(
+                readings,
                 capture.Error ?? "Waiting for valid frame intervals.");
+            return;
         }
 
         Status = new FrameProviderStatus(
             FrameCaptureState.Active,
             capture.TargetProcess);
-        return
-        [
-            Reading(MetricRegistry.Fps, statistics.Fps),
-            Reading(
+        readings.Add(Reading(MetricRegistry.Fps, statistics.Fps));
+        readings.Add(Reading(
                 MetricRegistry.OnePercentLow,
-                statistics.OnePercentLow),
-            Reading(MetricRegistry.Frametime, statistics.Frametime),
-        ];
+                statistics.OnePercentLow));
+        readings.Add(Reading(
+            MetricRegistry.Frametime,
+            statistics.Frametime));
     }
 
     public void Dispose() => _monitor.Dispose();
 
-    private static IReadOnlyList<MetricReading> Unavailable(string error) =>
-    [
-        Reading(MetricRegistry.Fps, null, error),
-        Reading(MetricRegistry.OnePercentLow, null, error),
-        Reading(MetricRegistry.Frametime, null, error),
-    ];
+    private static void AddUnavailable(
+        ICollection<MetricReading> readings,
+        string error)
+    {
+        readings.Add(Reading(MetricRegistry.Fps, null, error));
+        readings.Add(Reading(
+            MetricRegistry.OnePercentLow,
+            null,
+            error));
+        readings.Add(Reading(
+            MetricRegistry.Frametime,
+            null,
+            error));
+    }
 
     private static MetricReading Reading(
         string metricId,

@@ -114,7 +114,14 @@ internal sealed class InternetPathProbe : IDisposable
 
         foreach (ProbeTargetState target in _targets)
         {
-            target.Dispose();
+            try
+            {
+                target.Dispose();
+            }
+            catch
+            {
+                // Continue releasing the remaining independent Ping handles.
+            }
         }
     }
 
@@ -122,25 +129,28 @@ internal sealed class InternetPathProbe : IDisposable
         bool selectTarget,
         int selectedTargetIndex)
     {
-        TargetProbeResult[] results;
-        if (selectTarget)
+        if (!selectTarget)
         {
-            Task<TargetProbeResult>[] probes = [.. _targets
-                .Select((target, index) =>
-                    ProbeTargetAsync(index, target))];
-            results = await Task.WhenAll(probes).ConfigureAwait(false);
-        }
-        else
-        {
-            results =
-            [
-                await ProbeTargetAsync(
-                    selectedTargetIndex,
-                    _targets[selectedTargetIndex])
-                    .ConfigureAwait(false),
-            ];
+            TargetProbeResult result = await ProbeTargetAsync(
+                selectedTargetIndex,
+                _targets[selectedTargetIndex]).ConfigureAwait(false);
+            lock (_sync)
+            {
+                _probeInProgress = false;
+                if (!_disposed)
+                {
+                    _targets[result.TargetIndex].Add(result.Result);
+                }
+            }
+
+            return;
         }
 
+        Task<TargetProbeResult>[] probes = [.. _targets
+            .Select((target, index) =>
+                ProbeTargetAsync(index, target))];
+        TargetProbeResult[] results =
+            await Task.WhenAll(probes).ConfigureAwait(false);
         lock (_sync)
         {
             _probeInProgress = false;
@@ -154,37 +164,34 @@ internal sealed class InternetPathProbe : IDisposable
                 _targets[result.TargetIndex].Add(result.Result);
             }
 
-            if (selectTarget)
+            TargetProbeResult? best = null;
+            foreach (TargetProbeResult result in results)
             {
-                TargetProbeResult? best = null;
-                foreach (TargetProbeResult result in results)
+                if (result.Result.IsSuccess &&
+                    (best is null ||
+                     result.Result.RoundtripMilliseconds <
+                     best.Value.Result.RoundtripMilliseconds))
                 {
-                    if (result.Result.IsSuccess &&
-                        (best is null ||
-                         result.Result.RoundtripMilliseconds <
-                         best.Value.Result.RoundtripMilliseconds))
-                    {
-                        best = result;
-                    }
+                    best = result;
+                }
+            }
+
+            if (best is not null)
+            {
+                int bestTargetIndex = best.Value.TargetIndex;
+                if (_selectedTargetIndex >= 0 &&
+                    _selectedTargetIndex != bestTargetIndex)
+                {
+                    _targets[bestTargetIndex].Reset(
+                        best.Value.Result);
                 }
 
-                if (best is not null)
-                {
-                    int bestTargetIndex = best.Value.TargetIndex;
-                    if (_selectedTargetIndex >= 0 &&
-                        _selectedTargetIndex != bestTargetIndex)
-                    {
-                        _targets[bestTargetIndex].Reset(
-                            best.Value.Result);
-                    }
-
-                    _selectedTargetIndex = bestTargetIndex;
-                    _selectionFailures = 0;
-                }
-                else
-                {
-                    _selectionFailures++;
-                }
+                _selectedTargetIndex = bestTargetIndex;
+                _selectionFailures = 0;
+            }
+            else
+            {
+                _selectionFailures++;
             }
         }
     }

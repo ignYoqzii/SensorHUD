@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using LibreHardwareMonitor.Hardware;
@@ -11,8 +11,8 @@ namespace SensorHUD.Collector.Sampling.Hardware;
 /// </summary>
 internal static class SensorLookup
 {
-    private static readonly ConcurrentDictionary<string, string> DeviceIds =
-        new(StringComparer.Ordinal);
+    private static readonly ConditionalWeakTable<IHardware, DeviceIdentity>
+        DeviceIds = [];
 
     public static void BufferAll(
         IHardware hardware,
@@ -54,14 +54,17 @@ internal static class SensorLookup
     }
 
     public static string StableDeviceId(IHardware hardware) =>
-        DeviceIds.GetOrAdd(
-            hardware.Identifier.ToString(),
-            static identifier =>
-            {
-                byte[] hash = SHA256.HashData(
-                    Encoding.UTF8.GetBytes(identifier));
-                return Convert.ToHexString(hash)[..10];
-            });
+        DeviceIds.GetValue(
+            hardware,
+            static device => new DeviceIdentity(
+                CreateDeviceId(device.Identifier.ToString()))).Value;
+
+    private static string CreateDeviceId(string identifier)
+    {
+        byte[] hash = SHA256.HashData(
+            Encoding.UTF8.GetBytes(identifier));
+        return Convert.ToHexString(hash)[..10];
+    }
 
     private static void AddRecursive(
         IHardware hardware,
@@ -77,4 +80,6 @@ internal static class SensorLookup
             AddRecursive(child, destination);
         }
     }
+
+    private sealed record DeviceIdentity(string Value);
 }

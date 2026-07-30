@@ -16,21 +16,18 @@ internal sealed class InternetConnectionMetricsProvider :
 
     public string Name => "Internet connection";
 
-    public IReadOnlyList<MetricReading> Sample()
+    public void Sample(ICollection<MetricReading> readings)
     {
         _probe.StartProbe();
         InternetPathStatistics statistics = _probe.Capture();
-        return
-        [
-            Reading(
-                MetricRegistry.Ping,
-                statistics.PingMilliseconds,
-                statistics.Error),
-            Reading(
-                MetricRegistry.PacketLoss,
-                statistics.PacketLossPercent,
-                statistics.Error),
-        ];
+        readings.Add(Reading(
+            MetricRegistry.Ping,
+            statistics.PingMilliseconds,
+            statistics.Error));
+        readings.Add(Reading(
+            MetricRegistry.PacketLoss,
+            statistics.PacketLossPercent,
+            statistics.Error));
     }
 
     public void Dispose() => _probe.Dispose();

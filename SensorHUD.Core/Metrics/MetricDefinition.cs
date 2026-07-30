@@ -76,6 +76,16 @@ public sealed record MetricDefinition
     public required int Decimals { get; init; }
 
     /// <summary>
+    /// Gets the default color of literal text, device names, and metric names.
+    /// </summary>
+    public required string TextColor { get; init; }
+
+    /// <summary>
+    /// Gets the default color of the formatted metric value and unit.
+    /// </summary>
+    public required string ValueUnitColor { get; init; }
+
+    /// <summary>
     /// Gets whether a new installation displays the metric by default.
     /// </summary>
     public bool IsVisibleByDefault { get; init; } = true;

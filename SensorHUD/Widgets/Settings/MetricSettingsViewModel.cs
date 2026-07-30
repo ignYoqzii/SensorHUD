@@ -3,17 +3,20 @@ using System.Collections.Generic;
 using System.Linq;
 using SensorHUD.Core.Metrics;
 using SensorHUD.Core.Settings;
+using SensorHUD.Presentation;
 
 namespace SensorHUD.Widgets.Settings;
 
 /// <summary>
 /// Bindable editor state for one global or device-specific metric.
 /// </summary>
-public sealed partial class MetricSettingsViewModel : ObservableObject
+public sealed class MetricSettingsViewModel : ObservableObject
 {
     private bool _isVisible;
     private string _format;
     private DecimalOption _selectedDecimals;
+    private readonly MetricColorSettingViewModel _textColor;
+    private readonly MetricColorSettingViewModel _valueUnitColor;
 
     internal MetricSettingsViewModel(
         string key,
@@ -28,6 +31,19 @@ public sealed partial class MetricSettingsViewModel : ObservableObject
         _format = string.IsNullOrWhiteSpace(settings?.Format)
             ? definition.Format
             : settings.Format;
+        _textColor = CreateColorSetting(
+            "Text color",
+            "Literal text, {device}, and {name}",
+            "Choose metric text color",
+            settings?.TextColor,
+            definition.TextColor);
+        _valueUnitColor = CreateColorSetting(
+            "Value and unit color",
+            "{value} and {unit}",
+            "Choose metric value and unit color",
+            settings?.ValueUnitColor,
+            definition.ValueUnitColor);
+        ColorSettings = [_textColor, _valueUnitColor];
 
         List<DecimalOption> options =
         [
@@ -59,6 +75,8 @@ public sealed partial class MetricSettingsViewModel : ObservableObject
 
     public IReadOnlyList<DecimalOption> DecimalOptions { get; }
 
+    public MetricColorSettingViewModel[] ColorSettings { get; }
+
     public bool IsVisible
     {
         get => _isVisible;
@@ -88,7 +106,31 @@ public sealed partial class MetricSettingsViewModel : ObservableObject
         IsVisible = IsVisible,
         Format = Format,
         Decimals = SelectedDecimals.Value,
+        TextColor = _textColor.ColorText,
+        ValueUnitColor = _valueUnitColor.ColorText,
     };
+
+    private MetricColorSettingViewModel CreateColorSetting(
+        string label,
+        string description,
+        string automationName,
+        string? preference,
+        string defaultColor)
+    {
+        MetricColorSettingViewModel setting = new(
+            label,
+            description,
+            automationName,
+            XamlTextStyle.ParseColor(
+                string.IsNullOrWhiteSpace(preference)
+                    ? defaultColor
+                    : preference));
+        setting.Changed += ColorSetting_Changed;
+        return setting;
+    }
+
+    private void ColorSetting_Changed(object? sender, EventArgs e) =>
+        Changed?.Invoke(this, EventArgs.Empty);
 
     private void SetSetting<T>(ref T field, T value)
     {

@@ -35,6 +35,11 @@ public sealed class SettingsPageViewModel
         Appearance = new AppearanceSettingsViewModel(normalized.Appearance);
         Status = new CollectorStatusViewModel();
         MetricCategories = CreateMetricCategories(snapshot);
+        PackageVersion version = Package.Current.Id.Version;
+        VersionText =
+            $"Version {version.Major}.{version.Minor}.{version.Build}";
+        CopyrightText =
+            $"© {DateTime.Now.Year} yoqzii - All rights reserved.";
 
         Layout.Changed += Section_Changed;
         Appearance.Changed += Section_Changed;
@@ -50,25 +55,14 @@ public sealed class SettingsPageViewModel
 
     public IReadOnlyList<MetricCategoryViewModel> MetricCategories { get; }
 
-#pragma warning disable CA1822 // Mark members as static
-    public string VersionText
-#pragma warning restore CA1822 // Mark members as static
-    {
-        get
-        {
-            PackageVersion version = Package.Current.Id.Version;
-            return $"Version {version.Major}.{version.Minor}.{version.Build}";
-        }
-    }
+    public string VersionText { get; }
 
-#pragma warning disable CA1822 // Mark members as static
-    public string CopyrightText => $"© {DateTime.Now.Year} yoqzii - All rights reserved.";
-#pragma warning restore CA1822 // Mark members as static
+    public string CopyrightText { get; }
 
     internal WidgetSettings ToSettings()
     {
         WidgetSettings result = SettingsDefaults.Create();
-        result.Metrics = CloneMetricSettings(_savedMetricSettings);
+        CopyMetricSettings(_savedMetricSettings, result.Metrics);
         Layout.ApplyTo(result);
         Appearance.ApplyTo(result);
 
@@ -176,14 +170,30 @@ public sealed class SettingsPageViewModel
         Changed?.Invoke(this, EventArgs.Empty);
 
     private static Dictionary<string, MetricDisplaySettings> CloneMetricSettings(
-        IReadOnlyDictionary<string, MetricDisplaySettings> preferences) =>
-        preferences.ToDictionary(
-            pair => pair.Key,
-            pair => new MetricDisplaySettings
-            {
-                IsVisible = pair.Value.IsVisible,
-                Format = pair.Value.Format,
-                Decimals = pair.Value.Decimals,
-            },
-            StringComparer.Ordinal);
+        IReadOnlyDictionary<string, MetricDisplaySettings> preferences)
+    {
+        Dictionary<string, MetricDisplaySettings> result =
+            new(preferences.Count, StringComparer.Ordinal);
+        CopyMetricSettings(preferences, result);
+        return result;
+    }
+
+    private static void CopyMetricSettings(
+        IReadOnlyDictionary<string, MetricDisplaySettings> source,
+        Dictionary<string, MetricDisplaySettings> destination)
+    {
+        foreach ((string key, MetricDisplaySettings value) in source)
+        {
+            destination.Add(
+                key,
+                new MetricDisplaySettings
+                {
+                    IsVisible = value.IsVisible,
+                    Format = value.Format,
+                    Decimals = value.Decimals,
+                    TextColor = value.TextColor,
+                    ValueUnitColor = value.ValueUnitColor,
+                });
+        }
+    }
 }

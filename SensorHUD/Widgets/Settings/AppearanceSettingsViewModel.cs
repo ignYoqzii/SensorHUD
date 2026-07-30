@@ -2,16 +2,13 @@ using System;
 using System.Collections.Generic;
 using SensorHUD.Core.Settings;
 using SensorHUD.Infrastructure;
-using SensorHUD.Presentation;
-using Windows.UI;
-using Windows.UI.Xaml.Media;
 
 namespace SensorHUD.Widgets.Settings;
 
 /// <summary>
 /// Bindable typography and background settings.
 /// </summary>
-public sealed partial class AppearanceSettingsViewModel : ObservableObject
+public sealed class AppearanceSettingsViewModel : ObservableObject
 {
     private static readonly WidgetFontWeight[] FontWeightChoices =
         Enum.GetValues<WidgetFontWeight>();
@@ -20,7 +17,6 @@ public sealed partial class AppearanceSettingsViewModel : ObservableObject
     private string _fontFamily;
     private WidgetFontWeight _fontWeight;
     private double _fontSize;
-    private Color _fontColor;
 
     internal AppearanceSettingsViewModel(AppearanceSettings settings)
     {
@@ -29,7 +25,6 @@ public sealed partial class AppearanceSettingsViewModel : ObservableObject
         _fontFamily = settings.FontFamily;
         _fontWeight = settings.FontWeight;
         _fontSize = settings.FontSize;
-        _fontColor = XamlTextStyle.ParseColor(settings.FontColor);
     }
 
     public event EventHandler? Changed;
@@ -90,27 +85,6 @@ public sealed partial class AppearanceSettingsViewModel : ObservableObject
 
     public string FontSizeText => $"{FontSize:F0}";
 
-    /// <summary>
-    /// Gets or sets the font color selected by the native UWP color picker.
-    /// The value is converted back to portable ARGB text when persisted.
-    /// </summary>
-    public Color FontColor
-    {
-        get => _fontColor;
-        set
-        {
-            if (SetSetting(ref _fontColor, value))
-            {
-                Notify(nameof(FontColorBrush));
-                Notify(nameof(FontColorText));
-            }
-        }
-    }
-
-    public SolidColorBrush FontColorBrush => new(FontColor);
-
-    public string FontColorText => XamlTextStyle.FormatColor(FontColor);
-
     internal void ApplyTo(WidgetSettings settings)
     {
         settings.Appearance = new AppearanceSettings
@@ -120,7 +94,6 @@ public sealed partial class AppearanceSettingsViewModel : ObservableObject
             FontFamily = FontFamily,
             FontWeight = FontWeight,
             FontSize = FontSize,
-            FontColor = XamlTextStyle.FormatColor(FontColor),
         };
     }
 

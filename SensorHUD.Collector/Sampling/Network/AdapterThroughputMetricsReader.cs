@@ -44,28 +44,58 @@ internal static class AdapterThroughputMetricsReader
             return;
         }
 
-        double sent = 0;
-        double received = 0;
+        double? sent = null;
+        double? received = null;
         foreach (IHardware network in networks)
         {
             SensorLookup.BufferAll(network, sensorBuffer);
-            sent += SensorLookup.FirstValue(
+            double? upload = SensorLookup.FirstValue(
                 sensorBuffer,
                 SensorType.Throughput,
-                UploadNames) ?? 0;
-            received += SensorLookup.FirstValue(
+                UploadNames);
+            double? download = SensorLookup.FirstValue(
                 sensorBuffer,
                 SensorType.Throughput,
-                DownloadNames) ?? 0;
+                DownloadNames);
+            if (upload is not null)
+            {
+                sent = (sent ?? 0) + upload;
+            }
+
+            if (download is not null)
+            {
+                received = (received ?? 0) + download;
+            }
         }
 
-        readings.Add(HardwareReading.Value(
+        AddReading(
+            readings,
             MetricRegistry.NetworkSend,
             sent * BytesToMegabits,
-            DeviceName));
-        readings.Add(HardwareReading.Value(
+            "upload",
+            hardwareAccessError);
+        AddReading(
+            readings,
             MetricRegistry.NetworkReceive,
             received * BytesToMegabits,
-            DeviceName));
+            "download",
+            hardwareAccessError);
     }
+
+    private static void AddReading(
+        ICollection<MetricReading> readings,
+        string metricId,
+        double? value,
+        string direction,
+        string? hardwareAccessError) =>
+        readings.Add(value is null
+            ? HardwareReading.Unavailable(
+                metricId,
+                DeviceName,
+                $"No network {direction} throughput sensor was found.",
+                hardwareAccessError)
+            : HardwareReading.Value(
+                metricId,
+                value,
+                DeviceName));
 }

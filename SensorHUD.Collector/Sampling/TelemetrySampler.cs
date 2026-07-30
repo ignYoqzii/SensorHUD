@@ -53,12 +53,16 @@ internal sealed class TelemetrySampler : IDisposable
 
         foreach (ITelemetryProvider provider in _providers)
         {
+            int firstProviderReading = readings.Count;
             try
             {
-                readings.AddRange(provider.Sample());
+                provider.Sample(readings);
             }
             catch (Exception exception)
             {
+                readings.RemoveRange(
+                    firstProviderReading,
+                    readings.Count - firstProviderReading);
                 // One unexpected source failure is reported in health but does
                 // not suppress independent hardware or frame sources.
                 lastProviderError =
@@ -91,7 +95,15 @@ internal sealed class TelemetrySampler : IDisposable
         {
             if (provider is IDisposable disposable)
             {
-                disposable.Dispose();
+                try
+                {
+                    disposable.Dispose();
+                }
+                catch
+                {
+                    // Every independent provider still gets a chance to
+                    // release its resources during process teardown.
+                }
             }
         }
     }

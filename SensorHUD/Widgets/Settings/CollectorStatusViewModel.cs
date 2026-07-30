@@ -8,7 +8,7 @@ namespace SensorHUD.Widgets.Settings;
 /// <summary>
 /// Read-only collector status presented by the settings widget.
 /// </summary>
-public sealed partial class CollectorStatusViewModel : ObservableObject
+public sealed class CollectorStatusViewModel : ObservableObject
 {
     private string _connection = "Stopped";
     private string _lastSnapshot = "Waiting";

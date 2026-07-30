@@ -11,27 +11,27 @@ namespace SensorHUD.Collector.Transport;
 /// one reviewed file makes security-sensitive handle and marshalling behavior
 /// easier to audit.
 /// </summary>
-internal static class NativeMethods
+internal static partial class NativeMethods
 {
     internal const int ProcessQueryLimitedInformation = 0x1000;
 
-    [DllImport("kernel32.dll", SetLastError = true)]
+    [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    internal static extern bool GetNamedPipeClientProcessId(
+    internal static partial bool GetNamedPipeClientProcessId(
         SafePipeHandle pipe,
         out uint clientProcessId);
 
-    [DllImport("kernel32.dll", SetLastError = true)]
+    [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    internal static extern bool GetAppContainerNamedObjectPath(
+    internal static partial bool GetAppContainerNamedObjectPath(
         IntPtr token,
         IntPtr appContainerSid,
         uint objectPathLength,
         IntPtr objectPath,
         out uint returnLength);
 
-    [DllImport("kernel32.dll", SetLastError = true)]
-    internal static extern SafeProcessHandle OpenProcess(
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    internal static partial SafeProcessHandle OpenProcess(
         int desiredAccess,
         [MarshalAs(UnmanagedType.Bool)] bool inheritHandle,
         uint processId);
@@ -42,29 +42,29 @@ internal static class NativeMethods
         ref uint packageFamilyNameLength,
         StringBuilder packageFamilyName);
 
-    [DllImport(
+    [LibraryImport(
         "advapi32.dll",
-        CharSet = CharSet.Unicode,
         EntryPoint =
             "ConvertStringSecurityDescriptorToSecurityDescriptorW",
-        SetLastError = true)]
+        SetLastError = true,
+        StringMarshalling = StringMarshalling.Utf16)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    internal static extern bool ConvertStringSecurityDescriptor(
+    internal static partial bool ConvertStringSecurityDescriptor(
         string stringSecurityDescriptor,
         uint stringSecurityDescriptorRevision,
         out IntPtr securityDescriptor,
         out uint securityDescriptorSize);
 
-    [DllImport("advapi32.dll", SetLastError = true)]
+    [LibraryImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    internal static extern bool GetSecurityDescriptorSacl(
+    internal static partial bool GetSecurityDescriptorSacl(
         IntPtr securityDescriptor,
         [MarshalAs(UnmanagedType.Bool)] out bool saclPresent,
         out IntPtr sacl,
         [MarshalAs(UnmanagedType.Bool)] out bool saclDefaulted);
 
-    [DllImport("advapi32.dll")]
-    internal static extern uint SetSecurityInfo(
+    [LibraryImport("advapi32.dll")]
+    internal static partial uint SetSecurityInfo(
         SafePipeHandle handle,
         int objectType,
         uint securityInformation,
@@ -73,19 +73,19 @@ internal static class NativeMethods
         IntPtr dacl,
         IntPtr sacl);
 
-    [DllImport("kernel32.dll")]
-    internal static extern IntPtr LocalFree(IntPtr memory);
+    [LibraryImport("kernel32.dll")]
+    internal static partial IntPtr LocalFree(IntPtr memory);
 
-    [DllImport("kernel32.dll", SetLastError = true)]
+    [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    internal static extern bool GlobalMemoryStatusEx(
+    internal static partial bool GlobalMemoryStatusEx(
         ref MemoryStatus memoryStatus);
 
-    [DllImport("user32.dll")]
-    internal static extern nint GetForegroundWindow();
+    [LibraryImport("user32.dll")]
+    internal static partial nint GetForegroundWindow();
 
-    [DllImport("user32.dll")]
-    internal static extern uint GetWindowThreadProcessId(
+    [LibraryImport("user32.dll")]
+    internal static partial uint GetWindowThreadProcessId(
         nint window,
         out uint processId);
 

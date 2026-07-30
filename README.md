@@ -140,9 +140,11 @@ Settings are saved automatically. You can:
 - Show or hide each metric.
 - Choose vertical or horizontal layout.
 - Change the horizontal separator.
-- Select the font family, weight, size, and color.
+- Select the font family, weight, and size.
 - Adjust background opacity.
-- Set a format and decimal places independently for every metric.
+- Set a format, decimal places, and colors independently for every metric.
+  Literal text plus `{device}` / `{name}` use one color, while `{value}` and
+  `{unit}` share another.
 - Configure each detected GPU independently.
 
 Select the metric-count button on a category to open its metric editors in a

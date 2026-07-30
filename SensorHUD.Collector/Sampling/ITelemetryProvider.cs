@@ -11,5 +11,5 @@ internal interface ITelemetryProvider
 {
     string Name { get; }
 
-    IReadOnlyList<MetricReading> Sample();
+    void Sample(ICollection<MetricReading> readings);
 }

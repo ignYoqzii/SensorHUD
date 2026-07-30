@@ -82,6 +82,8 @@ Every metric has one `MetricDefinition`.
 | `Unit` | Yes | Value of `{unit}`; use an empty string for no unit |
 | `Format` | Yes | Default overlay format |
 | `Decimals` | Yes | Default number of decimal places |
+| `TextColor` | Yes | Default ARGB color for literal text, `{device}`, and `{name}` |
+| `ValueUnitColor` | Yes | Default ARGB color shared by `{value}` and `{unit}` |
 | `SortOrder` | Yes | Position inside the category |
 | `IsVisibleByDefault` | No | Whether a fresh configuration shows it; defaults to `true` |
 | `IsPerDevice` | No | Whether every detected device has an independent reading and preference |
@@ -119,6 +121,8 @@ new()
     Unit = "W",
     Format = "{device} Power: {value} {unit}",
     Decimals = 1,
+    TextColor = "#FFFFFFFF",
+    ValueUnitColor = "#FFFFFFFF",
     IsVisibleByDefault = false,
     SortOrder = 2,
 },
@@ -156,6 +160,8 @@ new()
     Unit = "RPM",
     Format = "{device} Fan: {value} {unit}",
     Decimals = 0,
+    TextColor = "#FFFFFFFF",
+    ValueUnitColor = "#FFFFFFFF",
     SortOrder = 5,
     IsPerDevice = true,
 },
@@ -247,9 +253,9 @@ Use a provider for an independent data source:
 1. Create a focused `ITelemetryProvider` under
    `SensorHUD.Collector/Sampling`.
 2. Keep `Sample` short and non-blocking. Run slower I/O in the background and
-   expose only its latest bounded result.
-3. Return unavailable readings for expected startup, permission, hardware, or
-   connectivity states.
+   append only its latest bounded result to the supplied readings collection.
+3. Append unavailable readings for expected startup, permission, hardware,
+   or connectivity states.
 4. Implement `IDisposable` when the provider owns sessions, timers, handles,
    or background resources.
 5. Construct and register it in `TelemetrySampler.CreateDefault`.

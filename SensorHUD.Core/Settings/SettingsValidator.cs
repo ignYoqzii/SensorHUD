@@ -21,15 +21,15 @@ public static class SettingsValidator
             return defaults;
         }
 
-        WidgetSettings result = new()
-        {
-            Layout = Enum.IsDefined(source.Layout)
-                ? source.Layout
-                : defaults.Layout,
-            HorizontalSeparator = source.HorizontalSeparator ?? string.Empty,
-            Appearance = NormalizeAppearance(source.Appearance),
-            Metrics = [],
-        };
+        WidgetSettings result = defaults;
+        result.Layout = Enum.IsDefined(source.Layout)
+            ? source.Layout
+            : defaults.Layout;
+        result.HorizontalSeparator =
+            source.HorizontalSeparator ?? string.Empty;
+        result.Appearance = NormalizeAppearance(
+            source.Appearance,
+            defaults.Appearance);
 
         foreach ((string key, MetricDisplaySettings preference) in
                  source.Metrics ?? [])
@@ -59,6 +59,12 @@ public static class SettingsValidator
                         SettingsDefaults.MinimumDecimals,
                         SettingsDefaults.MaximumDecimals)
                     : null,
+                TextColor = NormalizeColor(
+                    preference.TextColor,
+                    definition.TextColor),
+                ValueUnitColor = NormalizeColor(
+                    preference.ValueUnitColor,
+                    definition.ValueUnitColor),
             };
         }
 
@@ -66,9 +72,9 @@ public static class SettingsValidator
     }
 
     private static AppearanceSettings NormalizeAppearance(
-        AppearanceSettings? source)
+        AppearanceSettings? source,
+        AppearanceSettings defaults)
     {
-        AppearanceSettings defaults = SettingsDefaults.Create().Appearance;
         if (source is null)
         {
             return defaults;
@@ -90,9 +96,6 @@ public static class SettingsValidator
                 source.FontSize,
                 SettingsDefaults.MinimumFontSize,
                 SettingsDefaults.MaximumFontSize),
-            FontColor = IsArgbColor(source.FontColor)
-                ? source.FontColor.ToUpperInvariant()
-                : defaults.FontColor,
         };
     }
 
@@ -104,4 +107,7 @@ public static class SettingsValidator
             System.Globalization.NumberStyles.HexNumber,
             provider: null,
             out _);
+
+    private static string NormalizeColor(string? value, string fallback) =>
+        IsArgbColor(value) ? value!.ToUpperInvariant() : fallback;
 }

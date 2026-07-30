@@ -22,17 +22,19 @@ internal static class MemoryMetricsReader
         {
             const string error =
                 "Failed to query Windows system memory status.";
-            AddUnavailable(MetricRegistry.MemoryUsage);
-            AddUnavailable(MetricRegistry.MemoryUsed);
-            AddUnavailable(MetricRegistry.MemoryTotal);
+            AddUnavailable(
+                readings,
+                MetricRegistry.MemoryUsage,
+                error);
+            AddUnavailable(
+                readings,
+                MetricRegistry.MemoryUsed,
+                error);
+            AddUnavailable(
+                readings,
+                MetricRegistry.MemoryTotal,
+                error);
             return;
-
-            void AddUnavailable(string metricId) =>
-                readings.Add(HardwareReading.Unavailable(
-                    metricId,
-                    DeviceName,
-                    error,
-                    hardwareAccessError: null));
         }
 
         readings.Add(HardwareReading.Value(
@@ -48,4 +50,14 @@ internal static class MemoryMetricsReader
             memory.TotalPhys / BytesPerGigabyte,
             DeviceName));
     }
+
+    private static void AddUnavailable(
+        ICollection<MetricReading> readings,
+        string metricId,
+        string error) =>
+        readings.Add(HardwareReading.Unavailable(
+            metricId,
+            DeviceName,
+            error,
+            hardwareAccessError: null));
 }

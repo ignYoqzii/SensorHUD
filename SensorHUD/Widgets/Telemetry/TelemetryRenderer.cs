@@ -21,6 +21,7 @@ internal sealed class TelemetryRenderer(
     TextBlock horizontalText)
 {
     private readonly Dictionary<string, RenderNode> _nodes = [];
+    private readonly Dictionary<uint, SolidColorBrush> _brushes = [];
     private readonly List<string> _renderedKeys = [];
 
     private WidgetSettings? _renderedSettings;
@@ -52,6 +53,7 @@ internal sealed class TelemetryRenderer(
     {
         _renderedSettings = settings;
         _nodes.Clear();
+        _brushes.Clear();
         _renderedKeys.Clear();
         foreach (PresentedMetric metric in model.Metrics)
         {
@@ -60,7 +62,12 @@ internal sealed class TelemetryRenderer(
 
         verticalItems.Items.Clear();
         horizontalText.Inlines.Clear();
-        ApplyTextStyle(horizontalText, settings.Appearance);
+        FontFamily fontFamily = XamlTextStyle.CreateFontFamily(
+            settings.Appearance.FontFamily);
+        ApplyTextStyle(
+            horizontalText,
+            settings.Appearance,
+            fontFamily);
 
         if (settings.Layout == WidgetLayout.Horizontal)
         {
@@ -68,7 +75,7 @@ internal sealed class TelemetryRenderer(
         }
         else
         {
-            BuildVertical(model, settings);
+            BuildVertical(model, settings, fontFamily);
         }
     }
 
@@ -91,12 +98,12 @@ internal sealed class TelemetryRenderer(
             _nodes.Add(metric.Key, node);
             first = false;
         }
-
     }
 
     private void BuildVertical(
         TelemetryDisplayModel model,
-        WidgetSettings settings)
+        WidgetSettings settings,
+        FontFamily fontFamily)
     {
         foreach (PresentedMetric metric in model.Metrics)
         {
@@ -105,13 +112,13 @@ internal sealed class TelemetryRenderer(
                 TextWrapping = TextWrapping.Wrap,
                 VerticalAlignment = VerticalAlignment.Top,
             };
-            ApplyTextStyle(text, settings.Appearance);
+            ApplyTextStyle(text, settings.Appearance, fontFamily);
 
             Border item = new()
             {
                 Child = text,
                 Padding = new Thickness(2, 0, 2, 2),
-                BorderBrush = new SolidColorBrush(
+                BorderBrush = GetBrush(
                     Color.FromArgb(65, 255, 255, 255)),
                 BorderThickness = new Thickness(0, 0, 0, 1),
             };
@@ -120,7 +127,7 @@ internal sealed class TelemetryRenderer(
         }
     }
 
-    private static RenderNode CreateNode(
+    private RenderNode CreateNode(
         TextBlock target,
         PresentedMetric metric,
         WidgetSettings settings)
@@ -129,7 +136,12 @@ internal sealed class TelemetryRenderer(
         foreach (MetricTextPart part in metric.Parts)
         {
             Run run = new() { Text = part.Text };
-            ApplyRoleStyle(run, part.Role, settings.Appearance.FontSize);
+            ApplyRoleStyle(
+                run,
+                part.Role,
+                settings.Appearance.FontSize,
+                metric.Definition,
+                metric.Settings);
             target.Inlines.Add(run);
             runs.Add(run);
         }
@@ -152,7 +164,6 @@ internal sealed class TelemetryRenderer(
             {
                 node.Runs[index].Text = metric.Parts[index].Text;
             }
-
         }
     }
 
@@ -192,26 +203,34 @@ internal sealed class TelemetryRenderer(
         }
     }
 
-    private static void ApplyTextStyle(
+    private void ApplyTextStyle(
         TextBlock text,
-        AppearanceSettings appearance)
+        AppearanceSettings appearance,
+        FontFamily fontFamily)
     {
-        text.FontFamily = XamlTextStyle.CreateFontFamily(
-            appearance.FontFamily);
+        text.FontFamily = fontFamily;
         text.FontSize = appearance.FontSize;
         text.FontWeight = XamlTextStyle.ToFontWeight(
             appearance.FontWeight);
-        text.Foreground = new SolidColorBrush(
-            XamlTextStyle.ParseColor(appearance.FontColor));
+        text.Foreground = GetBrush(Colors.White);
         text.TextWrapping = TextWrapping.Wrap;
         text.VerticalAlignment = VerticalAlignment.Top;
     }
 
-    private static void ApplyRoleStyle(
+    private void ApplyRoleStyle(
         Run run,
         MetricTextRole role,
-        double fontSize)
+        double fontSize,
+        MetricDefinition definition,
+        MetricDisplaySettings? settings)
     {
+        string color = role == MetricTextRole.Text
+            ? GetColor(settings?.TextColor, definition.TextColor)
+            : GetColor(
+                settings?.ValueUnitColor,
+                definition.ValueUnitColor);
+        run.Foreground = GetBrush(XamlTextStyle.ParseColor(color));
+
         if (role == MetricTextRole.Value)
         {
             run.FontWeight = FontWeights.Normal;
@@ -224,6 +243,25 @@ internal sealed class TelemetryRenderer(
                 SettingsDefaults.MinimumFontSize,
                 fontSize * 0.82);
         }
+    }
+
+    private static string GetColor(string? preference, string fallback) =>
+        string.IsNullOrWhiteSpace(preference) ? fallback : preference;
+
+    private SolidColorBrush GetBrush(Color color)
+    {
+        uint key =
+            (uint)color.A << 24 |
+            (uint)color.R << 16 |
+            (uint)color.G << 8 |
+            color.B;
+        if (!_brushes.TryGetValue(key, out SolidColorBrush? brush))
+        {
+            brush = new SolidColorBrush(color);
+            _brushes.Add(key, brush);
+        }
+
+        return brush;
     }
 
     private static string FormatSeparator(string separator)

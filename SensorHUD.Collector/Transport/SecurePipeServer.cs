@@ -1,13 +1,14 @@
 using System.Buffers.Binary;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
-using SensorHUD.Core.Transport;
 using Microsoft.Win32.SafeHandles;
+using SensorHUD.Core.Transport;
 
 namespace SensorHUD.Collector.Transport;
 
@@ -26,19 +27,16 @@ internal sealed class SecurePipeServer(string packageFamilyName)
     private const int KernelObject = 6;
     private const string LowIntegrityLabelSddl = "S:(ML;;NW;;;LW)";
 
+    private readonly string _pipeName =
+        GetPackagePipeName(packageFamilyName);
     private readonly PipeSecurity _security = CreateSecurity(packageFamilyName);
 
     public NamedPipeServerStream Create()
     {
-        return Create(GetPackagePipeName(packageFamilyName));
-    }
-
-    private NamedPipeServerStream Create(string pipeName)
-    {
         // LABEL_SECURITY_INFORMATION requires WRITE_OWNER on the handle.
         // Request it at creation; the DACL still controls every client.
         NamedPipeServerStream pipe = NamedPipeServerStreamAcl.Create(
-            pipeName,
+            _pipeName,
             PipeDirection.InOut,
             maxNumberOfServerInstances: 1,
             transmissionMode: PipeTransmissionMode.Byte,
@@ -110,7 +108,9 @@ internal sealed class SecurePipeServer(string packageFamilyName)
             PipeAccessRights.ReadWrite |
             PipeAccessRights.Synchronize;
 
-        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+        security.SetAccessRuleProtection(
+            isProtected: true,
+            preserveInheritance: false);
         // AppContainer restricted-token access checks require the requested
         // rights for both a normal SID and the exact package SID.
         security.AddAccessRule(new PipeAccessRule(
@@ -125,11 +125,15 @@ internal sealed class SecurePipeServer(string packageFamilyName)
         // The service's initial handle is created directly. These rules allow
         // trusted operating-system administrators to inspect or recover it.
         security.AddAccessRule(new PipeAccessRule(
-            new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
+            new SecurityIdentifier(
+                WellKnownSidType.LocalSystemSid,
+                null),
             PipeAccessRights.FullControl,
             AccessControlType.Allow));
         security.AddAccessRule(new PipeAccessRule(
-            new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
+            new SecurityIdentifier(
+                WellKnownSidType.BuiltinAdministratorsSid,
+                null),
             PipeAccessRights.FullControl,
             AccessControlType.Allow));
 
@@ -243,10 +247,10 @@ internal sealed class SecurePipeServer(string packageFamilyName)
         byte[] sidBytes = new byte[packageSid.BinaryLength];
         packageSid.GetBinaryForm(sidBytes, 0);
 
-        System.Runtime.InteropServices.GCHandle pinnedSid =
-            System.Runtime.InteropServices.GCHandle.Alloc(
-            sidBytes,
-            System.Runtime.InteropServices.GCHandleType.Pinned);
+        GCHandle pinnedSid =
+            GCHandle.Alloc(
+                sidBytes,
+                GCHandleType.Pinned);
         try
         {
             _ = NativeMethods.GetAppContainerNamedObjectPath(
@@ -264,7 +268,7 @@ internal sealed class SecurePipeServer(string packageFamilyName)
             }
 
             IntPtr objectPathBuffer =
-                System.Runtime.InteropServices.Marshal.AllocHGlobal(
+                Marshal.AllocHGlobal(
                 checked((int)requiredLength * sizeof(char)));
             try
             {
@@ -276,13 +280,12 @@ internal sealed class SecurePipeServer(string packageFamilyName)
                     out _))
                 {
                     throw new Win32Exception(
-                    System.Runtime.InteropServices.Marshal.GetLastWin32Error(),
+                        Marshal.GetLastWin32Error(),
                         "Could not resolve the package named-object path.");
                 }
 
                 string objectPath =
-                    System.Runtime.InteropServices.Marshal.PtrToStringUni(
-                        objectPathBuffer) ??
+                    Marshal.PtrToStringUni(objectPathBuffer) ??
                     throw new InvalidOperationException(
                         "Windows returned an empty package named-object path.");
                 string relativeObjectPath = objectPath.TrimStart('\\');
@@ -294,8 +297,9 @@ internal sealed class SecurePipeServer(string packageFamilyName)
                     // token, Windows returns \AppContainerNamedObjects\...
                     // without its per-session prefix. Named pipes expose that
                     // namespace below Sessions\<terminal-session-id>.
-                    int sessionId =
-                        System.Diagnostics.Process.GetCurrentProcess().SessionId;
+                    using Process currentProcess =
+                        Process.GetCurrentProcess();
+                    int sessionId = currentProcess.SessionId;
                     relativeObjectPath =
                         $@"Sessions\{sessionId}\{relativeObjectPath}";
                 }
@@ -306,8 +310,7 @@ internal sealed class SecurePipeServer(string packageFamilyName)
             }
             finally
             {
-                System.Runtime.InteropServices.Marshal.FreeHGlobal(
-                    objectPathBuffer);
+                Marshal.FreeHGlobal(objectPathBuffer);
             }
         }
         finally
@@ -315,5 +318,4 @@ internal sealed class SecurePipeServer(string packageFamilyName)
             pinnedSid.Free();
         }
     }
-
 }

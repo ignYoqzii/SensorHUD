@@ -186,6 +186,62 @@
                                                 </DataTemplate>
                                             </ComboBox.ItemTemplate>
                                         </ComboBox>
+                                        <ItemsControl
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch"
+                                            ItemsSource="{x:Bind ColorSettings, Mode=OneTime}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Spacing="8" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="viewModels:MetricColorSettingViewModel">
+                                                    <Grid ColumnSpacing="12">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel VerticalAlignment="Center" Spacing="3">
+                                                            <TextBlock FontWeight="Medium" Text="{x:Bind Label}" />
+                                                            <TextBlock Style="{StaticResource ControlDescriptionStyle}" Text="{x:Bind Description}" />
+                                                        </StackPanel>
+                                                        <Button
+                                                            Grid.Column="1"
+                                                            Padding="10,7"
+                                                            VerticalAlignment="Center"
+                                                            AutomationProperties.Name="{x:Bind AutomationName}"
+                                                            CornerRadius="6"
+                                                            Style="{StaticResource SettingsActionButtonStyle}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                <Border
+                                                                    Width="22"
+                                                                    Height="22"
+                                                                    Background="{x:Bind ColorBrush, Mode=OneWay}"
+                                                                    BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="5" />
+                                                                <TextBlock VerticalAlignment="Center" Text="{x:Bind ColorText, Mode=OneWay}" />
+                                                            </StackPanel>
+                                                            <Button.Flyout>
+                                                                <Flyout FlyoutPresenterStyle="{StaticResource ColorPickerFlyoutPresenterStyle}" Placement="Bottom">
+                                                                    <ColorPicker
+                                                                        MinWidth="280"
+                                                                        MaxWidth="320"
+                                                                        IsAlphaEnabled="True"
+                                                                        IsAlphaTextInputVisible="False"
+                                                                        IsColorChannelTextInputVisible="False"
+                                                                        IsHexInputVisible="False"
+                                                                        IsMoreButtonVisible="False"
+                                                                        Style="{StaticResource SettingsColorPickerStyle}"
+                                                                        Color="{x:Bind Color, Mode=TwoWay}" />
+                                                                </Flyout>
+                                                            </Button.Flyout>
+                                                        </Button>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>

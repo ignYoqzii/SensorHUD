@@ -46,9 +46,8 @@ internal sealed class HardwareMetricsProvider :
 
     public string Name => "Hardware sensors";
 
-    public IReadOnlyList<MetricReading> Sample()
+    public void Sample(ICollection<MetricReading> readings)
     {
-        List<MetricReading> readings = new(24);
         _gpuBuffer.Clear();
         _networkBuffer.Clear();
         IHardware? cpu = null;
@@ -107,8 +106,6 @@ internal sealed class HardwareMetricsProvider :
                 readings,
                 _hardwareAccessError);
         }
-
-        return readings;
     }
 
     public void Dispose()
@@ -120,6 +117,12 @@ internal sealed class HardwareMetricsProvider :
         catch
         {
             // Shutdown must never delay collector process exit.
+        }
+        finally
+        {
+            _sensorBuffer.Clear();
+            _gpuBuffer.Clear();
+            _networkBuffer.Clear();
         }
     }
 

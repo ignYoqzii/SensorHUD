@@ -7,7 +7,7 @@ namespace SensorHUD.Widgets.Settings;
 /// <summary>
 /// Bindable state for layout direction and horizontal separation.
 /// </summary>
-public sealed partial class LayoutSettingsViewModel : ObservableObject
+public sealed class LayoutSettingsViewModel : ObservableObject
 {
     private static readonly WidgetLayout[] LayoutChoices =
         Enum.GetValues<WidgetLayout>();

@@ -10,7 +10,7 @@ namespace SensorHUD.Widgets.Settings;
 /// Publishes validated edits immediately, orders debounced atomic writes, and
 /// flushes the most recent unsaved model when the settings widget closes.
 /// </summary>
-internal sealed partial class SettingsAutoSaver(WidgetSettingsStore store) : IDisposable
+internal sealed class SettingsAutoSaver(WidgetSettingsStore store) : IDisposable
 {
     private readonly Lock _sync = new();
 

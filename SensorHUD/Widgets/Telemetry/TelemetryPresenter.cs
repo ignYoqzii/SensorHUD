@@ -103,18 +103,8 @@ internal static class TelemetryPresenter
         MetricReading? reading,
         WidgetSettings settings)
     {
-        string key;
-        try
-        {
-            key = MetricInstanceKey.Create(definition, reading?.DeviceId);
-        }
-        catch (ArgumentException)
-        {
-            // A malformed per-device reading is ignored at the frontend
-            // boundary instead of destabilizing the entire widget.
-            return;
-        }
-
+        string key =
+            MetricInstanceKey.Create(definition, reading?.DeviceId);
         settings.Metrics.TryGetValue(
             key,
             out MetricDisplaySettings? preference);
@@ -170,7 +160,7 @@ internal static class TelemetryPresenter
 /// <summary>
 /// One metric instance ready for XAML rendering.
 /// </summary>
-internal sealed record PresentedMetric(
+internal readonly record struct PresentedMetric(
     string Key,
     MetricDefinition Definition,
     MetricReading? Reading,
@@ -180,6 +170,6 @@ internal sealed record PresentedMetric(
 /// <summary>
 /// Complete frontend display state for one render pass.
 /// </summary>
-internal sealed record TelemetryDisplayModel(
+internal readonly record struct TelemetryDisplayModel(
     IReadOnlyList<PresentedMetric> Metrics,
     string? StatusText);

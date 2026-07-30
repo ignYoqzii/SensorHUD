@@ -9,9 +9,9 @@ namespace SensorHUD.Core.Telemetry;
 /// </summary>
 public sealed class TelemetrySnapshot
 {
-    public DateTimeOffset CapturedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    public required DateTimeOffset CapturedAtUtc { get; set; }
 
-    public CollectorHealth Health { get; set; } = new();
+    public required CollectorHealth Health { get; set; }
 
-    public List<MetricReading> Readings { get; set; } = [];
+    public required List<MetricReading> Readings { get; set; }
 }

@@ -20,7 +20,6 @@ public static class SettingsDefaults
     public const double MaximumFontSize = 72;
     public const int MinimumDecimals = 0;
     public const int MaximumDecimals = 2;
-    public const string FontColor = "#FFFFFFFF";
 
     public static readonly TimeSpan SaveDebounce =
         TimeSpan.FromMilliseconds(350);
@@ -28,18 +27,5 @@ public static class SettingsDefaults
     /// <summary>
     /// Creates a complete independent settings object containing defaults.
     /// </summary>
-    public static WidgetSettings Create() => new()
-    {
-        Layout = Layout,
-        HorizontalSeparator = HorizontalSeparator,
-        Appearance = new AppearanceSettings
-        {
-            BackgroundOpacity = BackgroundOpacity,
-            FontFamily = FontFamily,
-            FontWeight = FontWeight,
-            FontSize = FontSize,
-            FontColor = FontColor,
-        },
-        Metrics = [],
-    };
+    public static WidgetSettings Create() => new();
 }

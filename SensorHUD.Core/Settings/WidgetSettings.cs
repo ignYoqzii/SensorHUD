@@ -56,8 +56,6 @@ public sealed class AppearanceSettings
         SettingsDefaults.FontWeight;
 
     public double FontSize { get; set; } = SettingsDefaults.FontSize;
-
-    public string FontColor { get; set; } = SettingsDefaults.FontColor;
 }
 
 /// <summary>
@@ -76,4 +74,16 @@ public sealed class MetricDisplaySettings
     /// Gets or sets the decimal count. Null uses the registry default.
     /// </summary>
     public int? Decimals { get; set; }
+
+    /// <summary>
+    /// Gets or sets the color of literal text, device names, and metric names.
+    /// An empty value uses the registry default.
+    /// </summary>
+    public string TextColor { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the color of the formatted metric value and unit. An
+    /// empty value uses the registry default.
+    /// </summary>
+    public string ValueUnitColor { get; set; } = string.Empty;
 }

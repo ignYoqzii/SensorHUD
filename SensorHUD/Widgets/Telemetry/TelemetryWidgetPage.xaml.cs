@@ -68,6 +68,7 @@ public sealed partial class TelemetryWidgetPage : Page
         {
             _settings = settings;
             _snapshot = _collector.LatestSnapshot;
+            ApplyAppearance();
             Render();
         });
 
@@ -98,6 +99,7 @@ public sealed partial class TelemetryWidgetPage : Page
         await DispatchAsync(() =>
         {
             _settings = settings;
+            ApplyAppearance();
             Render();
         });
     }
@@ -108,7 +110,6 @@ public sealed partial class TelemetryWidgetPage : Page
             _settings,
             _snapshot,
             _collector.Status);
-        ApplyAppearance();
         _renderer.Render(model, _settings);
         StatusText.Text = model.StatusText;
         StatusText.Visibility = model.StatusText is null

@@ -20,15 +20,21 @@ internal sealed class PresentEventMonitor : IDisposable
     private readonly Dictionary<int, Queue<double>> _presentsByProcess = [];
     private readonly Dictionary<int, string> _processNameCache = [];
     private readonly List<int> _emptyProcessIds = new(4);
+    private readonly Thread _processingThread;
 
     private TraceEventSession? _session;
     private FrameCaptureState _traceState = FrameCaptureState.Starting;
     private string? _traceError;
-    private volatile bool _disposed;
+    private int _disposeState;
 
     public PresentEventMonitor()
     {
-        _ = Task.Run(ProcessEvents);
+        _processingThread = new Thread(ProcessEvents)
+        {
+            IsBackground = true,
+            Name = "SensorHUD frame trace",
+        };
+        _processingThread.Start();
     }
 
     /// <summary>
@@ -57,7 +63,9 @@ internal sealed class PresentEventMonitor : IDisposable
                     _traceError ?? "Starting frame trace.");
             }
 
-            int? processId = ChooseTargetProcess(calculationCutoff);
+            int? processId = ChooseTargetProcess(
+                calculationCutoff,
+                out int recentCount);
             if (processId is null)
             {
                 return new FrameCaptureWindow(
@@ -76,7 +84,8 @@ internal sealed class PresentEventMonitor : IDisposable
 
             double[] timestamps = CopyRecent(
                 _presentsByProcess[processId.Value],
-                calculationCutoff);
+                calculationCutoff,
+                recentCount);
             return new FrameCaptureWindow(
                 timestamps.Length < 2
                     ? FrameCaptureState.WarmingUp
@@ -91,8 +100,32 @@ internal sealed class PresentEventMonitor : IDisposable
 
     public void Dispose()
     {
-        _disposed = true;
-        _session?.Dispose();
+        if (Interlocked.Exchange(ref _disposeState, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            Volatile.Read(ref _session)?.Dispose();
+        }
+        catch
+        {
+            // The trace thread is still joined below so a failed ETW cleanup
+            // cannot skip the remaining shutdown coordination.
+        }
+
+        if (Thread.CurrentThread != _processingThread)
+        {
+            _ = _processingThread.Join(TimeSpan.FromSeconds(2));
+        }
+
+        lock (_sync)
+        {
+            _presentsByProcess.Clear();
+            _processNameCache.Clear();
+            _emptyProcessIds.Clear();
+        }
     }
 
     private void ProcessEvents()
@@ -104,33 +137,43 @@ internal sealed class PresentEventMonitor : IDisposable
                 {
                     StopOnDispose = true,
                 };
-            _session = session;
-            if (_disposed)
+            Volatile.Write(ref _session, session);
+            if (IsDisposed)
             {
                 return;
             }
 
             session.Source.Dynamic.All += OnTraceEvent;
-            TraceEventProviderOptions options = new()
+            try
             {
-                EventIDsToEnable =
-                [
-                    FrameCaptureDefaults.DxgKernelPresentEventId,
-                ],
-            };
-            session.EnableProvider(
-                FrameCaptureDefaults.DxgKernelProvider,
-                TraceEventLevel.Verbose,
-                ulong.MaxValue,
-                options);
+                TraceEventProviderOptions options = new()
+                {
+                    EventIDsToEnable =
+                    [
+                        FrameCaptureDefaults.DxgKernelPresentEventId,
+                    ],
+                };
+                session.EnableProvider(
+                    FrameCaptureDefaults.DxgKernelProvider,
+                    TraceEventLevel.Verbose,
+                    ulong.MaxValue,
+                    options);
 
-            lock (_sync)
-            {
-                _traceState = FrameCaptureState.WaitingForProcess;
-                _traceError = null;
+                lock (_sync)
+                {
+                    _traceState = FrameCaptureState.WaitingForProcess;
+                    _traceError = null;
+                }
+
+                session.Source.Process();
             }
-
-            session.Source.Process();
+            finally
+            {
+                session.Source.Dynamic.All -= OnTraceEvent;
+            }
+        }
+        catch (Exception) when (IsDisposed)
+        {
         }
         catch (UnauthorizedAccessException)
         {
@@ -142,11 +185,15 @@ internal sealed class PresentEventMonitor : IDisposable
             SetTraceError(
                 $"Frame telemetry unavailable: {exception.Message}");
         }
+        finally
+        {
+            Volatile.Write(ref _session, null);
+        }
     }
 
     private void OnTraceEvent(TraceEvent data)
     {
-        if (_disposed ||
+        if (IsDisposed ||
             data.ProcessID <= 0 ||
             data.ProviderGuid != FrameCaptureDefaults.DxgKernelProvider ||
             (int)data.ID != FrameCaptureDefaults.DxgKernelPresentEventId)
@@ -198,17 +245,26 @@ internal sealed class PresentEventMonitor : IDisposable
         }
     }
 
-    private int? ChooseTargetProcess(double cutoff)
+    private int? ChooseTargetProcess(
+        double cutoff,
+        out int recentCount)
     {
+        recentCount = 0;
         int foregroundProcessId = GetForegroundProcessId();
         if (foregroundProcessId > 0 &&
             !IsExcluded(foregroundProcessId) &&
             _presentsByProcess.TryGetValue(
                 foregroundProcessId,
-                out Queue<double>? foregroundQueue) &&
-            CountRecent(foregroundQueue, cutoff) >= 3)
+                out Queue<double>? foregroundQueue))
         {
-            return foregroundProcessId;
+            int foregroundCount = CountRecent(
+                foregroundQueue,
+                cutoff);
+            if (foregroundCount >= 3)
+            {
+                recentCount = foregroundCount;
+                return foregroundProcessId;
+            }
         }
 
         int? bestProcess = null;
@@ -228,6 +284,7 @@ internal sealed class PresentEventMonitor : IDisposable
             }
         }
 
+        recentCount = bestProcess is null ? 0 : bestCount;
         return bestProcess;
     }
 
@@ -278,9 +335,9 @@ internal sealed class PresentEventMonitor : IDisposable
 
     private static double[] CopyRecent(
         Queue<double> timestamps,
-        double cutoff)
+        double cutoff,
+        int count)
     {
-        int count = CountRecent(timestamps, cutoff);
         if (count == 0)
         {
             return [];
@@ -324,6 +381,8 @@ internal sealed class PresentEventMonitor : IDisposable
 
     private static double UtcSeconds(DateTime timestamp) =>
         (timestamp - DateTime.UnixEpoch).TotalSeconds;
+
+    private bool IsDisposed => Volatile.Read(ref _disposeState) != 0;
 }
 
 /// <summary>
