@@ -162,10 +162,7 @@ public sealed partial class SettingsWidgetPage : Page
         _collector.SnapshotReceived -= Collector_SnapshotReceived;
         _collector.StatusChanged -= Collector_StatusChanged;
         ViewModel.Changed -= ViewModel_Changed;
-        if (_widget is not null)
-        {
-            _widget.RequestedThemeChanged -= Widget_RequestedThemeChanged;
-        }
+        _widget?.RequestedThemeChanged -= Widget_RequestedThemeChanged;
 
         await _autoSaver.FlushAsync();
         _autoSaver.Dispose();
@@ -215,7 +212,7 @@ public sealed partial class SettingsWidgetPage : Page
                     MetricRegistry.TryGet(
                         reading.MetricId,
                         out MetricDefinition definition) &&
-                    definition.IsPerDevice &&
+                    definition.Scope == MetricScope.PerDevice &&
                     !string.IsNullOrWhiteSpace(reading.DeviceId))
                 .Select(reading =>
                     $"{reading.MetricId}\u001F{reading.DeviceId}\u001F" +

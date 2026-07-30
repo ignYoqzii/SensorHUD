@@ -141,10 +141,11 @@ Settings are saved automatically. You can:
 - Choose vertical or horizontal layout.
 - Change the horizontal separator.
 - Select the font family, weight, and size.
+- Align telemetry text horizontally and vertically.
 - Adjust background opacity.
 - Set a format, decimal places, and colors independently for every metric.
   Literal text plus `{device}` / `{name}` use one color, while `{value}` and
-  `{unit}` share another.
+  `{unit}` share another. Color flyouts accept editable ARGB hex values.
 - Configure each detected GPU independently.
 
 Select the metric-count button on a category to open its metric editors in a
@@ -266,14 +267,13 @@ properties or invalid values fall back safely to current defaults.
 
 | Document | Purpose |
 | --- | --- |
-| [Extending SensorHUD](docs/EXTENDING.md) | Add metrics, categories, per-device readings, providers, or global settings |
+| [Extending SensorHUD](docs/EXTENDING.md) | Architecture and recipes for metrics, categories, providers, and widget settings |
 | [Privacy policy](PRIVACY) | Local data handling and Internet stability probes |
 | [Third-party notices](THIRD-PARTY-NOTICES) | Dependency licenses and source information |
 
-The extension guide explains the complete metadata model, including category
-names and descriptions, format tokens, decimal defaults, sort order,
-global/per-device/mixed categories, stable device identities, provider
-ownership, and validation.
+The extension guide explains the settings and telemetry architecture,
+registry metadata, override persistence, global/per-device/mixed categories,
+stable device identities, provider ownership, and validation.
 
 ## Building from source
 

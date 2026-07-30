@@ -13,7 +13,7 @@ namespace SensorHUD.Widgets.Settings;
 /// bindings.
 ///
 /// Extension path:
-/// 1. New global setting: add its model/default/validation, expose it through
+/// 1. New widget setting: add its model/default/validation, expose it through
 ///    the relevant section view model, then add one XAML control.
 /// 2. New metric or category: declare its metadata in the metric registry and
 ///    publish readings; settings cards are generated here automatically.
@@ -22,15 +22,16 @@ namespace SensorHUD.Widgets.Settings;
 /// </summary>
 public sealed class SettingsPageViewModel
 {
-    private readonly Dictionary<string, MetricDisplaySettings>
-        _savedMetricSettings;
+    private readonly Dictionary<string, MetricOverrides>
+        _savedMetricOverrides;
 
     internal SettingsPageViewModel(
         WidgetSettings settings,
         TelemetrySnapshot? snapshot)
     {
         WidgetSettings normalized = SettingsValidator.Normalize(settings);
-        _savedMetricSettings = CloneMetricSettings(normalized.Metrics);
+        _savedMetricOverrides = CloneMetricOverrides(
+            normalized.MetricOverrides);
         Layout = new LayoutSettingsViewModel(normalized);
         Appearance = new AppearanceSettingsViewModel(normalized.Appearance);
         Status = new CollectorStatusViewModel();
@@ -62,14 +63,21 @@ public sealed class SettingsPageViewModel
     internal WidgetSettings ToSettings()
     {
         WidgetSettings result = SettingsDefaults.Create();
-        CopyMetricSettings(_savedMetricSettings, result.Metrics);
+        CopyMetricOverrides(
+            _savedMetricOverrides,
+            result.MetricOverrides);
         Layout.ApplyTo(result);
         Appearance.ApplyTo(result);
 
         foreach (MetricSettingsViewModel metric in
                  MetricCategories.SelectMany(category => category.Metrics))
         {
-            result.Metrics[metric.Key] = metric.ToSettings();
+            result.MetricOverrides.Remove(metric.Key);
+            MetricOverrides overrides = metric.ToOverrides();
+            if (!overrides.IsEmpty)
+            {
+                result.MetricOverrides.Add(metric.Key, overrides);
+            }
         }
 
         return result;
@@ -83,12 +91,11 @@ public sealed class SettingsPageViewModel
         foreach (MetricCategoryDefinition category in
                  MetricRegistry.Categories)
         {
-            MetricDefinition[] definitions = [.. MetricRegistry.All
-                .Where(definition =>
-                    definition.Category == category.Id)
-                .OrderBy(definition => definition.SortOrder)];
-            MetricDefinition[] globalDefinitions = [.. definitions.Where(definition => !definition.IsPerDevice)];
-            if (globalDefinitions.Length > 0)
+            IReadOnlyList<MetricDefinition> globalDefinitions =
+                MetricRegistry.GetMetrics(
+                    category.Id,
+                    MetricScope.Global);
+            if (globalDefinitions.Count > 0)
             {
                 categories.Add(new MetricCategoryViewModel(
                     category.Name,
@@ -98,8 +105,11 @@ public sealed class SettingsPageViewModel
                             CreateMetric(definition, null))]));
             }
 
-            MetricDefinition[] deviceDefinitions = [.. definitions.Where(definition => definition.IsPerDevice)];
-            if (deviceDefinitions.Length > 0)
+            IReadOnlyList<MetricDefinition> deviceDefinitions =
+                MetricRegistry.GetMetrics(
+                    category.Id,
+                    MetricScope.PerDevice);
+            if (deviceDefinitions.Count > 0)
             {
                 AddDeviceCategories(
                     categories,
@@ -127,7 +137,7 @@ public sealed class SettingsPageViewModel
                     reading.MetricId,
                     out MetricDefinition definition) &&
                 definition.Category == category.Id &&
-                definition.IsPerDevice &&
+                definition.Scope == MetricScope.PerDevice &&
                 !string.IsNullOrWhiteSpace(reading.DeviceId))
             .GroupBy(reading => reading.DeviceId!, StringComparer.Ordinal)
             .OrderBy(
@@ -155,13 +165,13 @@ public sealed class SettingsPageViewModel
         string? deviceId)
     {
         string key = MetricInstanceKey.Create(definition, deviceId);
-        _savedMetricSettings.TryGetValue(
+        _savedMetricOverrides.TryGetValue(
             key,
-            out MetricDisplaySettings? preference);
+            out MetricOverrides? overrides);
         MetricSettingsViewModel metric = new(
             key,
             definition,
-            preference);
+            overrides);
         metric.Changed += Section_Changed;
         return metric;
     }
@@ -169,24 +179,24 @@ public sealed class SettingsPageViewModel
     private void Section_Changed(object? sender, EventArgs e) =>
         Changed?.Invoke(this, EventArgs.Empty);
 
-    private static Dictionary<string, MetricDisplaySettings> CloneMetricSettings(
-        IReadOnlyDictionary<string, MetricDisplaySettings> preferences)
+    private static Dictionary<string, MetricOverrides> CloneMetricOverrides(
+        Dictionary<string, MetricOverrides> overrides)
     {
-        Dictionary<string, MetricDisplaySettings> result =
-            new(preferences.Count, StringComparer.Ordinal);
-        CopyMetricSettings(preferences, result);
+        Dictionary<string, MetricOverrides> result =
+            new(overrides.Count, StringComparer.Ordinal);
+        CopyMetricOverrides(overrides, result);
         return result;
     }
 
-    private static void CopyMetricSettings(
-        IReadOnlyDictionary<string, MetricDisplaySettings> source,
-        Dictionary<string, MetricDisplaySettings> destination)
+    private static void CopyMetricOverrides(
+        IReadOnlyDictionary<string, MetricOverrides> source,
+        Dictionary<string, MetricOverrides> destination)
     {
-        foreach ((string key, MetricDisplaySettings value) in source)
+        foreach ((string key, MetricOverrides value) in source)
         {
             destination.Add(
                 key,
-                new MetricDisplaySettings
+                new MetricOverrides
                 {
                     IsVisible = value.IsVisible,
                     Format = value.Format,

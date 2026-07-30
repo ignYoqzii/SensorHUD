@@ -22,17 +22,13 @@ public static class SettingsValidator
         }
 
         WidgetSettings result = defaults;
-        result.Layout = Enum.IsDefined(source.Layout)
-            ? source.Layout
-            : defaults.Layout;
-        result.HorizontalSeparator =
-            source.HorizontalSeparator ?? string.Empty;
+        result.Layout = NormalizeLayout(source.Layout, defaults.Layout);
         result.Appearance = NormalizeAppearance(
             source.Appearance,
             defaults.Appearance);
 
-        foreach ((string key, MetricDisplaySettings preference) in
-                 source.Metrics ?? [])
+        foreach ((string key, MetricOverrides overrides) in
+                 source.MetricOverrides ?? [])
         {
             if (!MetricInstanceKey.TryParse(
                     key,
@@ -41,35 +37,53 @@ public static class SettingsValidator
                 !MetricRegistry.TryGet(
                     metricId,
                     out MetricDefinition definition) ||
-                definition.IsPerDevice != (deviceId is not null) ||
-                preference is null)
+                (definition.Scope == MetricScope.PerDevice) !=
+                    (deviceId is not null) ||
+                overrides is null)
             {
                 continue;
             }
 
-            result.Metrics[key] = new MetricDisplaySettings
+            MetricOverrides normalized = new()
             {
-                IsVisible = preference.IsVisible,
-                Format = string.IsNullOrWhiteSpace(preference.Format)
-                    ? definition.Format
-                    : preference.Format,
-                Decimals = preference.Decimals is int decimals
-                    ? Math.Clamp(
-                        decimals,
-                        SettingsDefaults.MinimumDecimals,
-                        SettingsDefaults.MaximumDecimals)
-                    : null,
-                TextColor = NormalizeColor(
-                    preference.TextColor,
+                IsVisible = overrides.IsVisible is bool visible &&
+                    visible != definition.IsVisibleByDefault
+                        ? visible
+                        : null,
+                Format = NormalizeFormat(
+                    overrides.Format,
+                    definition.Format),
+                Decimals = NormalizeDecimals(
+                    overrides.Decimals,
+                    definition.Decimals),
+                TextColor = NormalizeColorOverride(
+                    overrides.TextColor,
                     definition.TextColor),
-                ValueUnitColor = NormalizeColor(
-                    preference.ValueUnitColor,
+                ValueUnitColor = NormalizeColorOverride(
+                    overrides.ValueUnitColor,
                     definition.ValueUnitColor),
             };
+            if (!normalized.IsEmpty)
+            {
+                result.MetricOverrides[key] = normalized;
+            }
         }
 
         return result;
     }
+
+    private static LayoutSettings NormalizeLayout(
+        LayoutSettings? source,
+        LayoutSettings defaults) => source is null
+            ? defaults
+            : new LayoutSettings
+            {
+                Direction = Enum.IsDefined(source.Direction)
+                    ? source.Direction
+                    : defaults.Direction,
+                HorizontalSeparator =
+                    source.HorizontalSeparator ?? string.Empty,
+            };
 
     private static AppearanceSettings NormalizeAppearance(
         AppearanceSettings? source,
@@ -96,6 +110,14 @@ public static class SettingsValidator
                 source.FontSize,
                 SettingsDefaults.MinimumFontSize,
                 SettingsDefaults.MaximumFontSize),
+            HorizontalTextAlignment =
+                Enum.IsDefined(source.HorizontalTextAlignment)
+                    ? source.HorizontalTextAlignment
+                    : defaults.HorizontalTextAlignment,
+            VerticalTextAlignment =
+                Enum.IsDefined(source.VerticalTextAlignment)
+                    ? source.VerticalTextAlignment
+                    : defaults.VerticalTextAlignment,
         };
     }
 
@@ -108,6 +130,45 @@ public static class SettingsValidator
             provider: null,
             out _);
 
-    private static string NormalizeColor(string? value, string fallback) =>
-        IsArgbColor(value) ? value!.ToUpperInvariant() : fallback;
+    private static string? NormalizeFormat(
+        string? value,
+        string fallback) =>
+        string.IsNullOrWhiteSpace(value) ||
+        string.Equals(value, fallback, StringComparison.Ordinal)
+            ? null
+            : value;
+
+    private static int? NormalizeDecimals(
+        int? value,
+        int fallback)
+    {
+        if (value is not int decimals)
+        {
+            return null;
+        }
+
+        int normalized = Math.Clamp(
+            decimals,
+            MetricDisplayConstraints.MinimumDecimals,
+            MetricDisplayConstraints.MaximumDecimals);
+        return normalized == fallback ? null : normalized;
+    }
+
+    private static string? NormalizeColorOverride(
+        string? value,
+        string fallback)
+    {
+        if (!IsArgbColor(value))
+        {
+            return null;
+        }
+
+        string normalized = value!.ToUpperInvariant();
+        return string.Equals(
+            normalized,
+            fallback,
+            StringComparison.OrdinalIgnoreCase)
+                ? null
+                : normalized;
+    }
 }

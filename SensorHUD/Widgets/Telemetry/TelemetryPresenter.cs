@@ -34,7 +34,7 @@ internal static class TelemetryPresenter
                 continue;
             }
 
-            if (definition.IsPerDevice)
+            if (definition.Scope == MetricScope.PerDevice)
             {
                 if (string.IsNullOrWhiteSpace(reading.DeviceId))
                 {
@@ -57,7 +57,7 @@ internal static class TelemetryPresenter
         List<PresentedMetric> metrics = new(MetricRegistry.All.Count);
         foreach (MetricDefinition definition in MetricRegistry.All)
         {
-            if (definition.IsPerDevice)
+            if (definition.Scope == MetricScope.PerDevice)
             {
                 foreach (((MetricCategory category, string deviceId),
                          string? deviceName) in devices)
@@ -105,10 +105,10 @@ internal static class TelemetryPresenter
     {
         string key =
             MetricInstanceKey.Create(definition, reading?.DeviceId);
-        settings.Metrics.TryGetValue(
+        settings.MetricOverrides.TryGetValue(
             key,
-            out MetricDisplaySettings? preference);
-        if (!(preference?.IsVisible ?? definition.IsVisibleByDefault))
+            out MetricOverrides? overrides);
+        if (!(overrides?.IsVisible ?? definition.IsVisibleByDefault))
         {
             return;
         }
@@ -117,8 +117,8 @@ internal static class TelemetryPresenter
             key,
             definition,
             reading,
-            preference,
-            MetricFormatter.Format(definition, reading, preference)));
+            overrides,
+            MetricFormatter.Format(definition, reading, overrides)));
     }
 
     private static int CompareMetrics(PresentedMetric left, PresentedMetric right)
@@ -164,7 +164,7 @@ internal readonly record struct PresentedMetric(
     string Key,
     MetricDefinition Definition,
     MetricReading? Reading,
-    MetricDisplaySettings? Settings,
+    MetricOverrides? Overrides,
     IReadOnlyList<MetricTextPart> Parts);
 
 /// <summary>

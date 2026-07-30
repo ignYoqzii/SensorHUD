@@ -1,4 +1,3 @@
-using System;
 using SensorHUD.Presentation;
 using Windows.UI;
 using Windows.UI.Xaml.Media;
@@ -8,7 +7,7 @@ namespace SensorHUD.Widgets.Settings;
 /// <summary>
 /// Bindable state for one metric color setting.
 /// </summary>
-public sealed class MetricColorSettingViewModel : ObservableObject
+public sealed class MetricColorSettingViewModel : EditableSettingsViewModel
 {
     private readonly SolidColorBrush _colorBrush;
     private Color _color;
@@ -25,8 +24,6 @@ public sealed class MetricColorSettingViewModel : ObservableObject
         _color = color;
         _colorBrush = new SolidColorBrush(color);
     }
-
-    public event EventHandler? Changed;
 
     public string Label { get; }
 
@@ -46,11 +43,29 @@ public sealed class MetricColorSettingViewModel : ObservableObject
 
             _colorBrush.Color = value;
             Notify(nameof(ColorText));
-            Changed?.Invoke(this, EventArgs.Empty);
+            RaiseChanged();
         }
     }
 
     public SolidColorBrush ColorBrush => _colorBrush;
 
-    public string ColorText => XamlTextStyle.FormatColor(Color);
+    /// <summary>
+    /// Gets or sets the color as RGB or ARGB hexadecimal text.
+    /// Invalid input is discarded without changing the current color.
+    /// </summary>
+    public string ColorText
+    {
+        get => XamlTextStyle.FormatColor(Color);
+        set
+        {
+            if (XamlTextStyle.TryParseColor(value, out Color color))
+            {
+                Color = color;
+            }
+            else
+            {
+                Notify(nameof(ColorText));
+            }
+        }
+    }
 }

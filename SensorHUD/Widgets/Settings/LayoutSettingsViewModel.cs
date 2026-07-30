@@ -7,28 +7,26 @@ namespace SensorHUD.Widgets.Settings;
 /// <summary>
 /// Bindable state for layout direction and horizontal separation.
 /// </summary>
-public sealed class LayoutSettingsViewModel : ObservableObject
+public sealed class LayoutSettingsViewModel : EditableSettingsViewModel
 {
-    private static readonly WidgetLayout[] LayoutChoices =
+    private static readonly WidgetLayout[] DirectionChoices =
         Enum.GetValues<WidgetLayout>();
 
-    private WidgetLayout _layout;
+    private WidgetLayout _direction;
     private string _horizontalSeparator;
 
     internal LayoutSettingsViewModel(WidgetSettings settings)
     {
-        _layout = settings.Layout;
-        _horizontalSeparator = settings.HorizontalSeparator;
+        _direction = settings.Layout.Direction;
+        _horizontalSeparator = settings.Layout.HorizontalSeparator;
     }
 
-    public event EventHandler? Changed;
+    public IReadOnlyList<WidgetLayout> DirectionOptions => DirectionChoices;
 
-    public IReadOnlyList<WidgetLayout> Options => LayoutChoices;
-
-    public WidgetLayout Layout
+    public WidgetLayout Direction
     {
-        get => _layout;
-        set => SetSetting(ref _layout, value);
+        get => _direction;
+        set => SetSetting(ref _direction, value);
     }
 
     public string HorizontalSeparator
@@ -39,15 +37,10 @@ public sealed class LayoutSettingsViewModel : ObservableObject
 
     internal void ApplyTo(WidgetSettings settings)
     {
-        settings.Layout = Layout;
-        settings.HorizontalSeparator = HorizontalSeparator;
-    }
-
-    private void SetSetting<T>(ref T field, T value)
-    {
-        if (SetProperty(ref field, value))
+        settings.Layout = new LayoutSettings
         {
-            Changed?.Invoke(this, EventArgs.Empty);
-        }
+            Direction = Direction,
+            HorizontalSeparator = HorizontalSeparator,
+        };
     }
 }

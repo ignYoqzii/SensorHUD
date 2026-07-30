@@ -8,7 +8,7 @@ namespace SensorHUD.Core.Settings;
 public static class SettingsDefaults
 {
     public const string FileName = "settings.json";
-    public const WidgetLayout Layout = WidgetLayout.Vertical;
+    public const WidgetLayout LayoutDirection = WidgetLayout.Vertical;
     public const string HorizontalSeparator = "|";
     public const double BackgroundOpacity = 0.72;
     public const double MinimumBackgroundOpacity = 0;
@@ -18,9 +18,10 @@ public static class SettingsDefaults
     public const double FontSize = 18;
     public const double MinimumFontSize = 8;
     public const double MaximumFontSize = 72;
-    public const int MinimumDecimals = 0;
-    public const int MaximumDecimals = 2;
-
+    public const WidgetHorizontalAlignment HorizontalTextAlignment =
+        WidgetHorizontalAlignment.Left;
+    public const WidgetVerticalAlignment VerticalTextAlignment =
+        WidgetVerticalAlignment.Center;
     public static readonly TimeSpan SaveDebounce =
         TimeSpan.FromMilliseconds(350);
 

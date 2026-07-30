@@ -143,8 +143,8 @@
                         </StackPanel>
                         <ComboBox
                             Header="Layout"
-                            ItemsSource="{x:Bind ViewModel.Layout.Options, Mode=OneWay}"
-                            SelectedItem="{x:Bind ViewModel.Layout.Layout, Mode=TwoWay}"
+                            ItemsSource="{x:Bind ViewModel.Layout.DirectionOptions, Mode=OneWay}"
+                            SelectedItem="{x:Bind ViewModel.Layout.Direction, Mode=TwoWay}"
                             Style="{StaticResource SettingsComboBoxStyle}" />
                         <TextBox
                             Description="Spacing is added automatically. Leave empty for a single space."
@@ -200,6 +200,23 @@
                                 VerticalAlignment="Center"
                                 FontWeight="SemiBold"
                                 Text="{x:Bind ViewModel.Appearance.FontSizeText, Mode=OneWay}" />
+                        </Grid>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ComboBox
+                                Header="Horizontal text alignment"
+                                ItemsSource="{x:Bind ViewModel.Appearance.HorizontalTextAlignmentOptions, Mode=OneWay}"
+                                SelectedItem="{x:Bind ViewModel.Appearance.HorizontalTextAlignment, Mode=TwoWay}"
+                                Style="{StaticResource SettingsComboBoxStyle}" />
+                            <ComboBox
+                                Grid.Column="1"
+                                Header="Vertical text alignment"
+                                ItemsSource="{x:Bind ViewModel.Appearance.VerticalTextAlignmentOptions, Mode=OneWay}"
+                                SelectedItem="{x:Bind ViewModel.Appearance.VerticalTextAlignment, Mode=TwoWay}"
+                                Style="{StaticResource SettingsComboBoxStyle}" />
                         </Grid>
                     </StackPanel>
                 </Border>

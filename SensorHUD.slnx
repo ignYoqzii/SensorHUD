@@ -3,6 +3,7 @@
     <Platform Name="x64" />
   </Configurations>
   <Project Path="SensorHUD.Core/SensorHUD.Core.csproj" />
+  <Project Path="SensorHUD.Core.Tests/SensorHUD.Core.Tests.csproj" />
   <Project Path="SensorHUD.Collector/SensorHUD.Collector.csproj">
     <Platform Solution="*|x64" Project="x64" />
   </Project>

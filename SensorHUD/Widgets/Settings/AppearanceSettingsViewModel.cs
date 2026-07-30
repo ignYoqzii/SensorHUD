@@ -6,17 +6,25 @@ using SensorHUD.Infrastructure;
 namespace SensorHUD.Widgets.Settings;
 
 /// <summary>
-/// Bindable typography and background settings.
+/// Bindable background, typography, and text-alignment settings.
 /// </summary>
-public sealed class AppearanceSettingsViewModel : ObservableObject
+public sealed class AppearanceSettingsViewModel : EditableSettingsViewModel
 {
     private static readonly WidgetFontWeight[] FontWeightChoices =
         Enum.GetValues<WidgetFontWeight>();
+    private static readonly WidgetHorizontalAlignment[]
+        HorizontalAlignmentChoices =
+            Enum.GetValues<WidgetHorizontalAlignment>();
+    private static readonly WidgetVerticalAlignment[]
+        VerticalAlignmentChoices =
+            Enum.GetValues<WidgetVerticalAlignment>();
 
     private double _backgroundOpacityPercent;
     private string _fontFamily;
     private WidgetFontWeight _fontWeight;
     private double _fontSize;
+    private WidgetHorizontalAlignment _horizontalTextAlignment;
+    private WidgetVerticalAlignment _verticalTextAlignment;
 
     internal AppearanceSettingsViewModel(AppearanceSettings settings)
     {
@@ -25,12 +33,18 @@ public sealed class AppearanceSettingsViewModel : ObservableObject
         _fontFamily = settings.FontFamily;
         _fontWeight = settings.FontWeight;
         _fontSize = settings.FontSize;
+        _horizontalTextAlignment = settings.HorizontalTextAlignment;
+        _verticalTextAlignment = settings.VerticalTextAlignment;
     }
-
-    public event EventHandler? Changed;
 
     public IReadOnlyList<WidgetFontWeight> FontWeightOptions =>
         FontWeightChoices;
+
+    public IReadOnlyList<WidgetHorizontalAlignment>
+        HorizontalTextAlignmentOptions => HorizontalAlignmentChoices;
+
+    public IReadOnlyList<WidgetVerticalAlignment>
+        VerticalTextAlignmentOptions => VerticalAlignmentChoices;
 
     public double MinimumBackgroundOpacityPercent =>
         SettingsDefaults.MinimumBackgroundOpacity *
@@ -85,6 +99,18 @@ public sealed class AppearanceSettingsViewModel : ObservableObject
 
     public string FontSizeText => $"{FontSize:F0}";
 
+    public WidgetHorizontalAlignment HorizontalTextAlignment
+    {
+        get => _horizontalTextAlignment;
+        set => SetSetting(ref _horizontalTextAlignment, value);
+    }
+
+    public WidgetVerticalAlignment VerticalTextAlignment
+    {
+        get => _verticalTextAlignment;
+        set => SetSetting(ref _verticalTextAlignment, value);
+    }
+
     internal void ApplyTo(WidgetSettings settings)
     {
         settings.Appearance = new AppearanceSettings
@@ -94,17 +120,8 @@ public sealed class AppearanceSettingsViewModel : ObservableObject
             FontFamily = FontFamily,
             FontWeight = FontWeight,
             FontSize = FontSize,
+            HorizontalTextAlignment = HorizontalTextAlignment,
+            VerticalTextAlignment = VerticalTextAlignment,
         };
-    }
-
-    private bool SetSetting<T>(ref T field, T value)
-    {
-        if (!SetProperty(ref field, value))
-        {
-            return false;
-        }
-
-        Changed?.Invoke(this, EventArgs.Empty);
-        return true;
     }
 }

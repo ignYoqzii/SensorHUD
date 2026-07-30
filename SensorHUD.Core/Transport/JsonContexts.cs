@@ -20,6 +20,7 @@ public sealed partial class CollectorJsonContext : JsonSerializerContext
 /// Native-AOT-compatible, strict, human-readable JSON metadata for settings.
 /// </summary>
 [JsonSourceGenerationOptions(
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
     WriteIndented = true)]

@@ -44,14 +44,14 @@ public static class MetricFormatter
     public static IReadOnlyList<MetricTextPart> Format(
         MetricDefinition definition,
         MetricReading? reading,
-        MetricDisplaySettings? settings)
+        MetricOverrides? overrides)
     {
         ArgumentNullException.ThrowIfNull(definition);
 
-        string format = string.IsNullOrWhiteSpace(settings?.Format)
+        string format = string.IsNullOrWhiteSpace(overrides?.Format)
             ? definition.Format
-            : settings.Format;
-        int decimals = settings?.Decimals ?? definition.Decimals;
+            : overrides.Format;
+        int decimals = overrides?.Decimals ?? definition.Decimals;
         string numericValue = reading?.Value is double value
             ? value.ToString(
                 GetNumericFormat(decimals),

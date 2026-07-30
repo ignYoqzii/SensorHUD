@@ -17,7 +17,7 @@ public static class MetricInstanceKey
     {
         ArgumentNullException.ThrowIfNull(definition);
 
-        if (!definition.IsPerDevice)
+        if (definition.Scope == MetricScope.Global)
         {
             return definition.Id;
         }

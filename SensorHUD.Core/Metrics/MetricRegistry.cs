@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 
 namespace SensorHUD.Core.Metrics;
@@ -149,7 +150,7 @@ public static class MetricRegistry
                 TextColor = "#FFFFFFFF",
                 ValueUnitColor = "#FFFFFFFF",
                 SortOrder = 0,
-                IsPerDevice = true,
+                Scope = MetricScope.PerDevice,
             },
             new()
             {
@@ -162,7 +163,7 @@ public static class MetricRegistry
                 TextColor = "#FFFFFFFF",
                 ValueUnitColor = "#FFFFFFFF",
                 SortOrder = 1,
-                IsPerDevice = true,
+                Scope = MetricScope.PerDevice,
             },
             new()
             {
@@ -175,7 +176,7 @@ public static class MetricRegistry
                 TextColor = "#FFFFFFFF",
                 ValueUnitColor = "#FFFFFFFF",
                 SortOrder = 2,
-                IsPerDevice = true,
+                Scope = MetricScope.PerDevice,
             },
             new()
             {
@@ -189,7 +190,7 @@ public static class MetricRegistry
                 ValueUnitColor = "#FFFFFFFF",
                 IsVisibleByDefault = false,
                 SortOrder = 3,
-                IsPerDevice = true,
+                Scope = MetricScope.PerDevice,
             },
             new()
             {
@@ -203,7 +204,7 @@ public static class MetricRegistry
                 ValueUnitColor = "#FFFFFFFF",
                 IsVisibleByDefault = false,
                 SortOrder = 4,
-                IsPerDevice = true,
+                Scope = MetricScope.PerDevice,
             },
             new()
             {
@@ -304,6 +305,16 @@ public static class MetricRegistry
                 definition => definition.Id,
                 StringComparer.Ordinal));
 
+    private static readonly ReadOnlyDictionary<
+        (MetricCategory Category, MetricScope Scope),
+        IReadOnlyList<MetricDefinition>> MetricsByCategoryAndScope =
+        BuildMetricsByCategoryAndScope();
+
+    static MetricRegistry()
+    {
+        ValidateDefinitions();
+    }
+
     /// <summary>
     /// Gets categories in stable display order.
     /// </summary>
@@ -328,6 +339,18 @@ public static class MetricRegistry
                 $"Metric category '{category}' is not registered.");
 
     /// <summary>
+    /// Gets the metrics in one category and scope in stable display order.
+    /// </summary>
+    public static IReadOnlyList<MetricDefinition> GetMetrics(
+        MetricCategory category,
+        MetricScope scope) =>
+        MetricsByCategoryAndScope.TryGetValue(
+            (category, scope),
+            out IReadOnlyList<MetricDefinition>? definitions)
+            ? definitions
+            : [];
+
+    /// <summary>
     /// Looks up a definition by its base metric ID.
     /// </summary>
     public static bool TryGet(
@@ -343,4 +366,97 @@ public static class MetricRegistry
             ? definition
             : throw new KeyNotFoundException(
                 $"Metric '{metricId}' is not registered.");
+
+    private static ReadOnlyDictionary<
+        (MetricCategory Category, MetricScope Scope),
+        IReadOnlyList<MetricDefinition>> BuildMetricsByCategoryAndScope()
+    {
+        Dictionary<
+            (MetricCategory Category, MetricScope Scope),
+            IReadOnlyList<MetricDefinition>> result = [];
+        foreach (IGrouping<
+                     (MetricCategory Category, MetricScope Scope),
+                     MetricDefinition> group in OrderedDefinitions.GroupBy(
+                     definition =>
+                         (definition.Category, definition.Scope)))
+        {
+            result.Add(
+                group.Key,
+                new ReadOnlyCollection<MetricDefinition>(
+                    [.. group.OrderBy(definition =>
+                        definition.SortOrder)]));
+        }
+
+        return new(result);
+    }
+
+    private static void ValidateDefinitions()
+    {
+        HashSet<int> categorySortOrders = [];
+        foreach (MetricCategoryDefinition category in OrderedCategories)
+        {
+            if (!categorySortOrders.Add(category.SortOrder))
+            {
+                throw new InvalidOperationException(
+                    $"Category sort order '{category.SortOrder}' is duplicated.");
+            }
+        }
+
+        foreach (MetricDefinition definition in OrderedDefinitions)
+        {
+            if (string.IsNullOrWhiteSpace(definition.Id))
+            {
+                throw new InvalidOperationException(
+                    "Metric IDs cannot be empty.");
+            }
+
+            _ = GetCategory(definition.Category);
+            if (!Enum.IsDefined(definition.Scope))
+            {
+                throw new InvalidOperationException(
+                    $"Metric '{definition.Id}' has an invalid scope.");
+            }
+
+            if (definition.Decimals <
+                    MetricDisplayConstraints.MinimumDecimals ||
+                definition.Decimals >
+                    MetricDisplayConstraints.MaximumDecimals)
+            {
+                throw new InvalidOperationException(
+                    $"Metric '{definition.Id}' has unsupported decimals.");
+            }
+
+            if (!IsArgbColor(definition.TextColor) ||
+                !IsArgbColor(definition.ValueUnitColor))
+            {
+                throw new InvalidOperationException(
+                    $"Metric '{definition.Id}' has an invalid default color.");
+            }
+        }
+
+        foreach (IGrouping<MetricCategory, MetricDefinition> category in
+                 OrderedDefinitions.GroupBy(definition =>
+                     definition.Category))
+        {
+            HashSet<int> metricSortOrders = [];
+            foreach (MetricDefinition definition in category)
+            {
+                if (!metricSortOrders.Add(definition.SortOrder))
+                {
+                    throw new InvalidOperationException(
+                        $"Metric sort order '{definition.SortOrder}' is " +
+                        $"duplicated in category '{category.Key}'.");
+                }
+            }
+        }
+    }
+
+    private static bool IsArgbColor(string value) =>
+        value.Length == 9 &&
+        value[0] == '#' &&
+        uint.TryParse(
+            value.AsSpan(1),
+            NumberStyles.HexNumber,
+            CultureInfo.InvariantCulture,
+            out _);
 }

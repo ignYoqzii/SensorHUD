@@ -5,6 +5,7 @@ using Microsoft.Gaming.XboxGameBar;
 using SensorHUD.Core.Settings;
 using SensorHUD.Core.Telemetry;
 using SensorHUD.Infrastructure;
+using SensorHUD.Presentation;
 using Windows.UI;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
@@ -68,8 +69,7 @@ public sealed partial class TelemetryWidgetPage : Page
         {
             _settings = settings;
             _snapshot = _collector.LatestSnapshot;
-            ApplyAppearance();
-            Render();
+            ApplySettings();
         });
 
         if (!_isUnloaded)
@@ -99,9 +99,15 @@ public sealed partial class TelemetryWidgetPage : Page
         await DispatchAsync(() =>
         {
             _settings = settings;
-            ApplyAppearance();
-            Render();
+            ApplySettings();
         });
+    }
+
+    private void ApplySettings()
+    {
+        ApplyAppearance();
+        ApplyContentAlignment();
+        Render();
     }
 
     private void Render()
@@ -122,6 +128,17 @@ public sealed partial class TelemetryWidgetPage : Page
             HorizontalText.Visibility = Visibility.Collapsed;
             VerticalItems.Visibility = Visibility.Collapsed;
         }
+    }
+
+    private void ApplyContentAlignment()
+    {
+        VerticalAlignment verticalAlignment =
+            XamlTextStyle.ToVerticalAlignment(
+                _settings.Appearance.VerticalTextAlignment);
+        ContentScrollViewer.VerticalContentAlignment = verticalAlignment;
+        ContentGrid.VerticalAlignment = verticalAlignment;
+        StatusText.TextAlignment = XamlTextStyle.ToTextAlignment(
+            _settings.Appearance.HorizontalTextAlignment);
     }
 
     private void ApplyAppearance()

@@ -14,6 +14,16 @@ public enum MetricCategory
 }
 
 /// <summary>
+/// Determines whether a metric has one system-wide instance or one instance
+/// for every detected device.
+/// </summary>
+public enum MetricScope
+{
+    Global,
+    PerDevice,
+}
+
+/// <summary>
 /// Describes one settings and presentation category.
 /// </summary>
 public sealed record MetricCategoryDefinition
@@ -96,7 +106,7 @@ public sealed record MetricDefinition
     public required int SortOrder { get; init; }
 
     /// <summary>
-    /// Gets whether each detected device has its own reading and preference.
+    /// Gets how readings and user overrides are scoped.
     /// </summary>
-    public bool IsPerDevice { get; init; }
+    public MetricScope Scope { get; init; }
 }

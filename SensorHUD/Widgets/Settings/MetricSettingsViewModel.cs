@@ -10,8 +10,9 @@ namespace SensorHUD.Widgets.Settings;
 /// <summary>
 /// Bindable editor state for one global or device-specific metric.
 /// </summary>
-public sealed class MetricSettingsViewModel : ObservableObject
+public sealed class MetricSettingsViewModel : EditableSettingsViewModel
 {
+    private readonly MetricDefinition _definition;
     private bool _isVisible;
     private string _format;
     private DecimalOption _selectedDecimals;
@@ -21,27 +22,28 @@ public sealed class MetricSettingsViewModel : ObservableObject
     internal MetricSettingsViewModel(
         string key,
         MetricDefinition definition,
-        MetricDisplaySettings? settings)
+        MetricOverrides? overrides)
     {
+        _definition = definition;
         Key = key;
         Name = definition.Name;
         UnitDescription = $"Unit: {definition.Unit}";
         _isVisible =
-            settings?.IsVisible ?? definition.IsVisibleByDefault;
-        _format = string.IsNullOrWhiteSpace(settings?.Format)
+            overrides?.IsVisible ?? definition.IsVisibleByDefault;
+        _format = string.IsNullOrWhiteSpace(overrides?.Format)
             ? definition.Format
-            : settings.Format;
+            : overrides.Format;
         _textColor = CreateColorSetting(
             "Text color",
             "Literal text, {device}, and {name}",
             "Choose metric text color",
-            settings?.TextColor,
+            overrides?.TextColor,
             definition.TextColor);
         _valueUnitColor = CreateColorSetting(
             "Value and unit color",
             "{value} and {unit}",
             "Choose metric value and unit color",
-            settings?.ValueUnitColor,
+            overrides?.ValueUnitColor,
             definition.ValueUnitColor);
         ColorSettings = [_textColor, _valueUnitColor];
 
@@ -49,8 +51,8 @@ public sealed class MetricSettingsViewModel : ObservableObject
         [
             new($"Default ({definition.Decimals})", null),
         ];
-        for (int decimals = SettingsDefaults.MinimumDecimals;
-             decimals <= SettingsDefaults.MaximumDecimals;
+        for (int decimals = MetricDisplayConstraints.MinimumDecimals;
+             decimals <= MetricDisplayConstraints.MaximumDecimals;
              decimals++)
         {
             options.Add(new DecimalOption(
@@ -62,10 +64,8 @@ public sealed class MetricSettingsViewModel : ObservableObject
 
         DecimalOptions = options;
         _selectedDecimals = options.First(option =>
-            option.Value == settings?.Decimals);
+            option.Value == overrides?.Decimals);
     }
-
-    public event EventHandler? Changed;
 
     public string Key { get; }
 
@@ -101,20 +101,33 @@ public sealed class MetricSettingsViewModel : ObservableObject
         }
     }
 
-    internal MetricDisplaySettings ToSettings() => new()
+    internal MetricOverrides ToOverrides() => new()
     {
-        IsVisible = IsVisible,
-        Format = Format,
-        Decimals = SelectedDecimals.Value,
-        TextColor = _textColor.ColorText,
-        ValueUnitColor = _valueUnitColor.ColorText,
+        IsVisible = IsVisible == _definition.IsVisibleByDefault
+            ? null
+            : IsVisible,
+        Format = string.Equals(
+            Format,
+            _definition.Format,
+            StringComparison.Ordinal)
+                ? null
+                : Format,
+        Decimals = SelectedDecimals.Value == _definition.Decimals
+            ? null
+            : SelectedDecimals.Value,
+        TextColor = GetColorOverride(
+            _textColor.ColorText,
+            _definition.TextColor),
+        ValueUnitColor = GetColorOverride(
+            _valueUnitColor.ColorText,
+            _definition.ValueUnitColor),
     };
 
     private MetricColorSettingViewModel CreateColorSetting(
         string label,
         string description,
         string automationName,
-        string? preference,
+        string? overrideValue,
         string defaultColor)
     {
         MetricColorSettingViewModel setting = new(
@@ -122,23 +135,25 @@ public sealed class MetricSettingsViewModel : ObservableObject
             description,
             automationName,
             XamlTextStyle.ParseColor(
-                string.IsNullOrWhiteSpace(preference)
+                string.IsNullOrWhiteSpace(overrideValue)
                     ? defaultColor
-                    : preference));
+                    : overrideValue));
         setting.Changed += ColorSetting_Changed;
         return setting;
     }
 
     private void ColorSetting_Changed(object? sender, EventArgs e) =>
-        Changed?.Invoke(this, EventArgs.Empty);
+        RaiseChanged();
 
-    private void SetSetting<T>(ref T field, T value)
-    {
-        if (SetProperty(ref field, value))
-        {
-            Changed?.Invoke(this, EventArgs.Empty);
-        }
-    }
+    private static string? GetColorOverride(
+        string value,
+        string fallback) =>
+        string.Equals(
+            value,
+            fallback,
+            StringComparison.OrdinalIgnoreCase)
+                ? null
+                : value;
 }
 
 /// <summary>

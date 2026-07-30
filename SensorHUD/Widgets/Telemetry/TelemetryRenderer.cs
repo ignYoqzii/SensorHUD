@@ -39,8 +39,9 @@ internal sealed class TelemetryRenderer(
             UpdateValues(model);
         }
 
-        UpdateTooltips(model, settings.Layout);
-        bool horizontal = settings.Layout == WidgetLayout.Horizontal;
+        UpdateTooltips(model, settings.Layout.Direction);
+        bool horizontal =
+            settings.Layout.Direction == WidgetLayout.Horizontal;
         horizontalText.Visibility =
             horizontal ? Visibility.Visible : Visibility.Collapsed;
         verticalItems.Visibility =
@@ -69,7 +70,7 @@ internal sealed class TelemetryRenderer(
             settings.Appearance,
             fontFamily);
 
-        if (settings.Layout == WidgetLayout.Horizontal)
+        if (settings.Layout.Direction == WidgetLayout.Horizontal)
         {
             BuildHorizontal(model, settings);
         }
@@ -90,7 +91,8 @@ internal sealed class TelemetryRenderer(
             {
                 horizontalText.Inlines.Add(new Run
                 {
-                    Text = FormatSeparator(settings.HorizontalSeparator),
+                    Text = FormatSeparator(
+                        settings.Layout.HorizontalSeparator),
                 });
             }
 
@@ -110,7 +112,6 @@ internal sealed class TelemetryRenderer(
             TextBlock text = new()
             {
                 TextWrapping = TextWrapping.Wrap,
-                VerticalAlignment = VerticalAlignment.Top,
             };
             ApplyTextStyle(text, settings.Appearance, fontFamily);
 
@@ -141,7 +142,7 @@ internal sealed class TelemetryRenderer(
                 part.Role,
                 settings.Appearance.FontSize,
                 metric.Definition,
-                metric.Settings);
+                metric.Overrides);
             target.Inlines.Add(run);
             runs.Add(run);
         }
@@ -214,7 +215,8 @@ internal sealed class TelemetryRenderer(
             appearance.FontWeight);
         text.Foreground = GetBrush(Colors.White);
         text.TextWrapping = TextWrapping.Wrap;
-        text.VerticalAlignment = VerticalAlignment.Top;
+        text.TextAlignment = XamlTextStyle.ToTextAlignment(
+            appearance.HorizontalTextAlignment);
     }
 
     private void ApplyRoleStyle(
@@ -222,12 +224,12 @@ internal sealed class TelemetryRenderer(
         MetricTextRole role,
         double fontSize,
         MetricDefinition definition,
-        MetricDisplaySettings? settings)
+        MetricOverrides? overrides)
     {
         string color = role == MetricTextRole.Text
-            ? GetColor(settings?.TextColor, definition.TextColor)
+            ? GetColor(overrides?.TextColor, definition.TextColor)
             : GetColor(
-                settings?.ValueUnitColor,
+                overrides?.ValueUnitColor,
                 definition.ValueUnitColor);
         run.Foreground = GetBrush(XamlTextStyle.ParseColor(color));
 

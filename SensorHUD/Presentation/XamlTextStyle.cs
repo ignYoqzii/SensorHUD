@@ -3,6 +3,7 @@ using System.Globalization;
 using SensorHUD.Core.Settings;
 using Windows.UI;
 using Windows.UI.Text;
+using Windows.UI.Xaml;
 using Windows.UI.Xaml.Media;
 
 namespace SensorHUD.Presentation;
@@ -34,26 +35,63 @@ internal static class XamlTextStyle
             _ => FontWeights.SemiBold,
         };
 
+    /// <summary>
+    /// Converts a durable horizontal alignment to its XAML equivalent.
+    /// </summary>
+    public static TextAlignment ToTextAlignment(
+        WidgetHorizontalAlignment alignment) => alignment switch
+        {
+            WidgetHorizontalAlignment.Center => TextAlignment.Center,
+            WidgetHorizontalAlignment.Right => TextAlignment.Right,
+            _ => TextAlignment.Left,
+        };
+
+    /// <summary>
+    /// Converts a durable vertical alignment to its XAML equivalent.
+    /// </summary>
+    public static VerticalAlignment ToVerticalAlignment(
+        WidgetVerticalAlignment alignment) => alignment switch
+        {
+            WidgetVerticalAlignment.Center => VerticalAlignment.Center,
+            WidgetVerticalAlignment.Bottom => VerticalAlignment.Bottom,
+            _ => VerticalAlignment.Top,
+        };
+
     public static Color ParseColor(string value)
     {
-        string hex = value.Trim().TrimStart('#');
+        return TryParseColor(value, out Color color)
+            ? color
+            : Colors.White;
+    }
+
+    /// <summary>
+    /// Tries to parse an RGB or ARGB hexadecimal color.
+    /// </summary>
+    public static bool TryParseColor(string? value, out Color color)
+    {
+        string hex = value?.Trim().TrimStart('#') ?? string.Empty;
         if (hex.Length == 6)
         {
             hex = "FF" + hex;
         }
 
-        return hex.Length == 8 &&
+        if (hex.Length == 8 &&
             uint.TryParse(
                 hex,
                 NumberStyles.HexNumber,
                 CultureInfo.InvariantCulture,
-                out uint argb)
-            ? Color.FromArgb(
+                out uint argb))
+        {
+            color = Color.FromArgb(
                 (byte)(argb >> 24),
                 (byte)(argb >> 16),
                 (byte)(argb >> 8),
-                (byte)argb)
-            : Colors.White;
+                (byte)argb);
+            return true;
+        }
+
+        color = default;
+        return false;
     }
 
     /// <summary>

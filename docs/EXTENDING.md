@@ -2,75 +2,76 @@
 
 [← Back to the README](../README.md)
 
-SensorHUD generates its compact category entries, metric-editor panels, and
-overlay presentation from shared metadata. In most cases, adding telemetry
-requires only two changes:
+SensorHUD is intentionally explicit and registry-driven. It does not load
+plugins, scan assemblies, or generate behavior through reflection. A
+contributor adds a small typed declaration and publishes data; the shared
+settings and telemetry pipelines do the rest.
 
-1. Describe the metric in
+In the common case, adding telemetry requires only:
+
+1. Add the metric ID and metadata to
    [`MetricRegistry`](../SensorHUD.Core/Metrics/MetricRegistry.cs).
 2. Publish a
    [`MetricReading`](../SensorHUD.Core/Telemetry/MetricReading.cs) from the
    collector.
 
-No category-specific settings XAML is required.
-
-## Contents
-
-- [Choose an extension](#choose-an-extension)
-- [Category metadata](#category-metadata)
-- [Metric metadata](#metric-metadata)
-- [Add a global metric](#add-a-global-metric)
-- [Add a per-device metric](#add-a-per-device-metric)
-- [Add a category](#add-a-category)
-- [Choose category behavior](#choose-category-behavior)
-- [Add a telemetry provider](#add-a-telemetry-provider)
-- [Add a global setting](#add-a-global-setting)
-- [Compatibility rules](#compatibility-rules)
-- [Validate the change](#validate-the-change)
+No category-specific settings XAML or rendering code is required.
 
 ## Choose an extension
 
 | Goal | Required work |
 | --- | --- |
-| Add a metric to an existing category | Add its ID and definition, then publish its reading |
-| Add a metric for every detected device | Do the above with `IsPerDevice = true` and stable device identity |
-| Add a category | Add one enum member, category metadata, metric definitions, and readings |
-| Add a new data source | Implement `ITelemetryProvider` and register it in `TelemetrySampler` |
-| Add a widget-wide preference | Extend the settings model, validation, view model, and XAML |
+| Metric in an existing category | Add its ID and definition, then publish its reading |
+| Metric for every detected device | Use `MetricScope.PerDevice` and publish a stable device ID |
+| New category | Add its enum member, category metadata, metrics, and readings |
+| Independent data source | Implement `ITelemetryProvider` and register it explicitly |
+| Widget-wide preference | Extend one settings section from core model through XAML |
 
-## Category metadata
+## Architecture and terminology
+
+Four concepts have deliberately separate responsibilities:
+
+| Concept | Purpose | Source of truth |
+| --- | --- | --- |
+| Widget setting | Layout or appearance shared by the complete widget | `SensorHUD.Core/Settings` |
+| Metric definition | Identity, category, scope, display defaults, and ordering | `MetricRegistry` |
+| Metric reading | One current numeric value and optional device identity or error | Collector provider |
+| Metric override | Optional user changes relative to a metric definition | `WidgetSettings.MetricOverrides` |
+
+A **global metric** has one system-wide instance. A **per-device metric** has
+one instance and one override key per detected device. Neither term means a
+widget-wide setting.
+
+```text
+MetricRegistry ───────┐
+                     ├─> TelemetryPresenter ─> TelemetryRenderer
+collector readings ──┤
+metric overrides ────┘
+
+settings XAML <─> section view models ─> SettingsValidator
+                                           ├─> immediate preview
+                                           └─> debounced atomic settings.json
+```
+
+### Important ownership rules
+
+- Providers publish data; they do not define formatting or settings.
+- `MetricRegistry` defines metric defaults; it does not collect data.
+- View models adapt typed core settings for XAML; they do not perform file I/O.
+- `SettingsValidator` is the boundary for loaded and edited settings.
+- `WidgetSettingsStore` owns the single durable settings file.
+- `SettingsAutoSaver` owns preview, debounce, ordering, and final flush.
+
+## Metric registry
 
 Every category has one `MetricCategoryDefinition`.
 
 | Property | Purpose |
 | --- | --- |
-| `Id` | Strongly typed category identity used by metric definitions |
+| `Id` | Strongly typed category identity |
 | `Name` | Heading displayed in settings |
-| `Description` | Optional text directly below the heading; use `null` to omit it |
+| `Description` | Optional text below the heading |
 | `SortOrder` | Display position; lower values appear first |
-
-```csharp
-new()
-{
-    Id = MetricCategory.Cpu,
-    Name = "CPU",
-    Description = "Processor utilization and temperature.",
-    SortOrder = 100,
-},
-```
-
-For a per-device category, the name and description are shared metadata.
-SensorHUD appends the provider-supplied device name to each generated card:
-
-```text
-GPU - NVIDIA GeForce RTX ...
-GPU - AMD Radeon Graphics
-```
-
-Larger gaps between category sort orders make inserting a future category
-possible without renumbering the existing categories.
-
-## Metric metadata
 
 Every metric has one `MetricDefinition`.
 
@@ -78,37 +79,39 @@ Every metric has one `MetricDefinition`.
 | --- | --- | --- |
 | `Id` | Yes | Stable provider and settings identity |
 | `Category` | Yes | Category containing the metric |
-| `Name` | Yes | Name in settings and value of `{name}` |
-| `Unit` | Yes | Value of `{unit}`; use an empty string for no unit |
+| `Name` | Yes | Settings name and `{name}` value |
+| `Unit` | Yes | `{unit}` value; use an empty string for no unit |
 | `Format` | Yes | Default overlay format |
-| `Decimals` | Yes | Default number of decimal places |
-| `TextColor` | Yes | Default ARGB color for literal text, `{device}`, and `{name}` |
-| `ValueUnitColor` | Yes | Default ARGB color shared by `{value}` and `{unit}` |
+| `Decimals` | Yes | Default decimal count |
+| `TextColor` | Yes | Default ARGB color for text, `{device}`, and `{name}` |
+| `ValueUnitColor` | Yes | Default ARGB color for `{value}` and `{unit}` |
 | `SortOrder` | Yes | Position inside the category |
-| `IsVisibleByDefault` | No | Whether a fresh configuration shows it; defaults to `true` |
-| `IsPerDevice` | No | Whether every detected device has an independent reading and preference |
+| `IsVisibleByDefault` | No | Fresh-install visibility; defaults to `true` |
+| `Scope` | No | `Global` or `PerDevice`; defaults to `Global` |
+
+`MetricRegistry` builds immutable ID and category/scope indexes once. It also
+checks duplicate IDs and sort orders, missing categories, decimal ranges, and
+default colors during initialization. Consumers should use `TryGet`,
+`GetCategory`, and `GetMetrics` rather than reimplementing registry queries.
+The supported decimal range lives with metric metadata in
+`MetricDisplayConstraints`.
 
 ### Format tokens
 
 | Token | Replaced with |
 | --- | --- |
 | `{name}` | Metric `Name` |
-| `{value}` | Reading formatted with the selected decimals |
+| `{value}` | Reading formatted with the effective decimal count |
 | `{unit}` | Metric `Unit` |
-| `{device}` | Provider-supplied device name, or the category name as a fallback |
-
-The settings widget offers the registry default and zero, one, or two decimal
-places. The supported range is defined by `MinimumDecimals` and
-`MaximumDecimals` in `SettingsDefaults`.
+| `{device}` | Provider-supplied device name, or category name as fallback |
 
 ## Add a global metric
 
-This example adds CPU power to the existing CPU category.
+This example adds CPU power.
 
-### 1. Add the stable ID and definition
+### 1. Add its stable ID and definition
 
-Add the ID near the top of `MetricRegistry`, then add its definition to
-`OrderedDefinitions`:
+Add both in `MetricRegistry`:
 
 ```csharp
 public const string CpuPower = "cpu.power";
@@ -128,9 +131,11 @@ new()
 },
 ```
 
-### 2. Publish the reading
+The default scope is `MetricScope.Global`.
 
-Add the value from the category's existing reader or provider:
+### 2. Publish its reading
+
+Add the value to the category's existing reader or provider:
 
 ```csharp
 readings.Add(new MetricReading
@@ -141,13 +146,12 @@ readings.Add(new MetricReading
 });
 ```
 
-The CPU category and format editor update automatically.
+The category card, metric editor, persistence, formatting, ordering, and
+overlay output update automatically.
 
 ## Add a per-device metric
 
-This example adds an independent fan-speed metric for every detected GPU.
-
-### 1. Add a per-device definition
+This example adds fan speed for every detected GPU:
 
 ```csharp
 public const string GpuFanSpeed = "gpu.fanSpeed";
@@ -163,11 +167,11 @@ new()
     TextColor = "#FFFFFFFF",
     ValueUnitColor = "#FFFFFFFF",
     SortOrder = 5,
-    IsPerDevice = true,
+    Scope = MetricScope.PerDevice,
 },
 ```
 
-### 2. Include device identity in every reading
+Every reading must include device identity:
 
 ```csharp
 readings.Add(new MetricReading
@@ -179,33 +183,23 @@ readings.Add(new MetricReading
 });
 ```
 
-- `DeviceId` is the durable settings identity. It must remain stable across
-  samples and restarts.
-- `DeviceName` is the user-facing label and may change.
+- `DeviceId` is durable identity and must remain stable across samples and
+  restarts.
+- `DeviceName` is a user-facing label and may change.
+- A settings card appears after a reading supplies that device ID.
+- LibreHardwareMonitor readers should use `SensorLookup.StableDeviceId`.
 
-SensorHUD creates one settings card and one saved preference per device. A
-card appears after the collector publishes a reading with that device ID.
-LibreHardwareMonitor readers should use `SensorLookup.StableDeviceId`.
+The durable key is `metricId@deviceId`. Global metrics use only `metricId`.
+Providers never construct these keys; `MetricInstanceKey` owns that rule.
 
 ## Add a category
 
-This example creates a Storage category.
+To create a Storage category:
 
-### 1. Add the category identity
-
-Add a member to `MetricCategory`:
-
-```csharp
-public enum MetricCategory
-{
-    // Existing categories...
-    Storage,
-}
-```
-
-### 2. Add category metadata
-
-Add a definition to `CategoryDefinitions` in `MetricRegistry`:
+1. Add `Storage` to the `MetricCategory` enum.
+2. Add its metadata to `CategoryDefinitions`.
+3. Add one or more definitions using `MetricCategory.Storage`.
+4. Publish their readings.
 
 ```csharp
 new()
@@ -217,87 +211,126 @@ new()
 },
 ```
 
-### 3. Add metrics and readings
+Scope belongs to each metric, not its category:
 
-Add one or more metric definitions assigned to `MetricCategory.Storage`, then
-publish their readings. SensorHUD generates the category heading,
-description, settings entries, metric panels, ordering, and overlay output
-automatically.
+| Category contents | Generated settings |
+| --- | --- |
+| Global metrics only | One category card |
+| Per-device metrics only | One card per detected device |
+| Mixed scopes | One global card plus one card per device |
 
-## Choose category behavior
+## Publish unavailable data
 
-Scope belongs to each metric rather than to the category.
+Expected unavailable data should still be a reading containing:
 
-| Behavior | Definitions | Generated settings |
-| --- | --- | --- |
-| Global | Every metric has `IsPerDevice = false` | One category card |
-| Per-device | Every metric has `IsPerDevice = true` | One card per detected device |
-| Mixed | Combine global and per-device metrics | One global card plus one card per device |
-
-For example, Storage can expose global `Total Activity` and per-drive
-`Temperature` without special mixed-category code.
-
-Expected unavailable data should still be published with:
-
-- Its metric ID.
+- Its registered metric ID.
 - Device identity when applicable.
 - A `null` value.
 - A concise explanatory error.
 
-Reserve provider exceptions for unexpected failures.
+Reserve provider exceptions for unexpected failures. `TelemetrySampler`
+isolates providers so one failure does not suppress independent sources.
 
 ## Add a telemetry provider
 
 Use a provider for an independent data source:
 
-1. Create a focused `ITelemetryProvider` under
-   `SensorHUD.Collector/Sampling`.
-2. Keep `Sample` short and non-blocking. Run slower I/O in the background and
-   append only its latest bounded result to the supplied readings collection.
-3. Append unavailable readings for expected startup, permission, hardware,
-   or connectivity states.
-4. Implement `IDisposable` when the provider owns sessions, timers, handles,
-   or background resources.
-5. Construct and register it in `TelemetrySampler.CreateDefault`.
+1. Implement `ITelemetryProvider` under `SensorHUD.Collector/Sampling`.
+2. Keep `Sample` short and non-blocking.
+3. Publish expected unavailable states as readings.
+4. Implement `IDisposable` when owning handles, timers, or background work.
+5. Construct it explicitly in `TelemetrySampler.CreateDefault`.
 
-An unexpected provider exception is reported through collector health without
-suppressing independent providers.
+Explicit registration is intentional. It is easy to trace, friendly to
+Native AOT, and avoids hidden reflection or assembly scanning.
 
 When data already comes from the shared LibreHardwareMonitor `Computer`,
 prefer a focused reader called by `HardwareMetricsProvider`. This preserves
-one hardware update and enumeration pass. Readers own their fallback
-readings; do not duplicate metric lists in the provider. Sources that do not
-need LibreHardwareMonitor, such as Windows physical-memory status, should
-remain independent of it.
+one hardware update and enumeration pass. Sources that do not require that
+shared computer should remain independent providers.
 
-## Add a global setting
+## Settings architecture
 
-1. Add the model property, default, and validation rule under
-   `SensorHUD.Core/Settings`.
-2. Expose it through the focused layout or appearance view model.
-3. Add its compiled `x:Bind` control to
-   [`SettingsWidgetPage.xaml`](../SensorHUD/Widgets/Settings/SettingsWidgetPage.xaml).
-4. Apply the relevant shared `Settings*Style` from
-   [`SettingsStyles.xaml`](../SensorHUD/Themes/SettingsStyles.xaml) instead of
-   creating one-off visual values.
+The root model is intentionally small:
 
-Metric-specific settings should remain registry-driven instead of becoming
-global properties or category-specific XAML.
+```text
+WidgetSettings
+├── Layout      -> LayoutSettings
+├── Appearance  -> AppearanceSettings
+└── MetricOverrides[MetricInstanceKey]
+```
 
-## Compatibility rules
+Files have one clear role:
 
-- Keep released metric IDs unchanged; they are durable settings identities.
-- Keep released per-device IDs stable.
+| File | Responsibility |
+| --- | --- |
+| `WidgetSettings.cs` | Root composition |
+| `LayoutSettings.cs` | Layout model and enum |
+| `AppearanceSettings.cs` | Appearance model and enums |
+| `MetricOverrides.cs` | Optional differences from registry defaults |
+| `SettingsDefaults.cs` | Defaults, supported ranges, and save debounce |
+| `SettingsValidator.cs` | Deep-copy normalization and override cleanup |
+| `*SettingsViewModel.cs` | Bindable editor state for one section |
+| `SettingsWidgetPage.xaml` | Explicit widget-setting controls |
+| `WidgetSettingsStore.cs` | Validated load and atomic save |
+| `SettingsAutoSaver.cs` | Preview, debounce, ordered save, and final flush |
+
+Only differences from metric registry defaults are persisted. Null override
+properties inherit the registry. If every property matches its default, the
+complete metric override entry is removed. This keeps defaults authoritative
+and the JSON compact.
+
+The installed settings file is:
+
+```text
+%LOCALAPPDATA%\Packages\<SensorHUD package>\LocalState\settings.json
+```
+
+## Add a widget setting
+
+Do not add metric-specific behavior as a widget setting. Metrics remain
+registry-driven.
+
+For a layout or appearance preference:
+
+1. Add the typed property to `LayoutSettings` or `AppearanceSettings`.
+2. Add its default or supported range to `SettingsDefaults`.
+3. Normalize it in the matching `SettingsValidator` section method.
+4. Add bindable state and `ApplyTo` mapping in the matching view model.
+5. Add one compiled `x:Bind` control to `SettingsWidgetPage.xaml`.
+6. Apply the setting in the telemetry widget or renderer.
+
+Use an existing shared `Settings*Style` from `SettingsStyles.xaml`. Keep
+specialized control behavior in a focused view model rather than weakening
+the core model with XAML types.
+
+This path is intentionally explicit. Widget settings can require different
+control types and runtime behavior; a generic dynamic-form system would be
+harder to understand and debug.
+
+## Durable identity rules
+
+- Never change a released metric ID.
+- Never reuse an old metric ID for different data.
+- Keep per-device IDs stable.
 - Category enum values are not persisted.
-- Change a metric's registry `Format` to change its default. Existing saved
-  custom formats remain unchanged until the user resets them.
+- Providers publish base metric IDs, never preference keys.
+- Registry defaults are not copied into settings unless the user changes
+  them.
 
 ## Validate the change
 
-1. Build the complete `Debug|x64` solution with Visual Studio MSBuild. This
-   validates the UWP frontend and generated XAML.
-2. Build `SensorHUD.Collector` in `Release|x64`.
-3. Test unavailable data and provider failure behavior.
-4. For per-device metrics, test at least two devices and verify that their
-   settings remain independent.
-5. Run `git diff --check` before submitting the change.
+1. Run the core tests:
+
+   ```powershell
+   dotnet test SensorHUD.Core.Tests\SensorHUD.Core.Tests.csproj -c Debug -p:Platform=x64
+   ```
+
+2. Build `Debug|x64` with Visual Studio MSBuild so the UWP XAML compiler runs.
+3. Build `SensorHUD.Collector` in `Release|x64`.
+4. Exercise expected unavailable and provider-failure behavior.
+5. Test at least two devices for per-device metrics.
+6. Run `git diff --check`.
+
+The core tests verify registry identity and grouping, metric-instance keys,
+override normalization, and compact settings serialization.

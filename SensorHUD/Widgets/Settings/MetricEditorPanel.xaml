@@ -225,16 +225,24 @@
                                                             </StackPanel>
                                                             <Button.Flyout>
                                                                 <Flyout FlyoutPresenterStyle="{StaticResource ColorPickerFlyoutPresenterStyle}" Placement="Bottom">
-                                                                    <ColorPicker
-                                                                        MinWidth="280"
-                                                                        MaxWidth="320"
-                                                                        IsAlphaEnabled="True"
-                                                                        IsAlphaTextInputVisible="False"
-                                                                        IsColorChannelTextInputVisible="False"
-                                                                        IsHexInputVisible="False"
-                                                                        IsMoreButtonVisible="False"
-                                                                        Style="{StaticResource SettingsColorPickerStyle}"
-                                                                        Color="{x:Bind Color, Mode=TwoWay}" />
+                                                                    <StackPanel Spacing="8">
+                                                                        <ColorPicker
+                                                                            MinWidth="280"
+                                                                            MaxWidth="320"
+                                                                            IsAlphaEnabled="True"
+                                                                            IsAlphaTextInputVisible="False"
+                                                                            IsColorChannelTextInputVisible="False"
+                                                                            IsHexInputVisible="False"
+                                                                            IsMoreButtonVisible="False"
+                                                                            Style="{StaticResource SettingsColorPickerStyle}"
+                                                                            Color="{x:Bind Color, Mode=TwoWay}" />
+                                                                        <TextBox
+                                                                            Header="Hex"
+                                                                            MaxLength="9"
+                                                                            PlaceholderText="#AARRGGBB"
+                                                                            Style="{StaticResource SettingsTextBoxStyle}"
+                                                                            Text="{x:Bind ColorText, Mode=TwoWay}" />
+                                                                    </StackPanel>
                                                                 </Flyout>
                                                             </Button.Flyout>
                                                         </Button>
