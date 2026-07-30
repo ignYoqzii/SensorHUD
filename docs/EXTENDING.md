@@ -42,17 +42,6 @@ A **global metric** has one system-wide instance. A **per-device metric** has
 one instance and one override key per detected device. Neither term means a
 widget-wide setting.
 
-```text
-MetricRegistry ───────┐
-                     ├─> TelemetryPresenter ─> TelemetryRenderer
-collector readings ──┤
-metric overrides ────┘
-
-settings XAML <─> section view models ─> SettingsValidator
-                                           ├─> immediate preview
-                                           └─> debounced atomic settings.json
-```
-
 ### Important ownership rules
 
 - Providers publish data; they do not define formatting or settings.
