@@ -48,32 +48,12 @@ SensorHUD keeps five concepts separate:
 | Metric override | User changes for one global or per-device metric slot | `WidgetSettings.MetricOverrides` |
 | Widget setting | Layout or appearance shared by the whole widget | `SensorHUD.Core/Settings` |
 
-The data flow is:
-
-```text
-raw source
-    |
-    v
-provider or LHM mapper
-    |
-    +-- MetricInstance declarations ----+
-    +-- available MetricReading values --+--> TelemetrySnapshot
-                                              |
-MetricRegistry + MetricOverrides -------------+--> TelemetryPresenter
-                                                    |
-                                                    v
-                                              stable render slots
-```
-
-The settings flow is separate:
-
-```text
-settings XAML
-    <-> section view models
-    <-> SettingsValidator
-    <-> immediate preview
-    <-> debounced, atomic settings.json save
-```
+Providers and LHM mappers publish device declarations and available readings
+into `TelemetrySnapshot`. The presenter joins that snapshot with registry
+definitions and user overrides, then the renderer updates stable XAML slots.
+The settings pipeline remains separate: section view models pass current
+values through `SettingsValidator` for immediate preview and debounced,
+atomic persistence.
 
 ### Provider, category, and mapper are different things
 
