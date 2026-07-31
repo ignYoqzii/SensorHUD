@@ -2,21 +2,22 @@
     x:Class="SensorHUD.Widgets.Settings.SettingsWidgetPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:viewModels="using:SensorHUD.Widgets.Settings">
+    xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+    xmlns:viewModels="using:SensorHUD.Widgets.Settings"
+    Background="{ThemeResource SettingsPageBackgroundBrush}">
 
     <Grid>
         <ScrollViewer x:Name="SettingsScrollViewer" VerticalScrollBarVisibility="Auto">
             <StackPanel
                 MaxWidth="760"
-                Padding="{StaticResource SettingsPagePadding}"
-                HorizontalAlignment="Stretch"
+                Padding="20,20,20,28"
                 Spacing="16">
 
                 <!--  Header  -->
                 <Border Padding="20" CornerRadius="16">
                     <Border.Background>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                            <GradientStop Offset="0" Color="#FF6FC8FF" />
+                            <GradientStop Offset="0" Color="#FF60CDFF" />
                             <GradientStop Offset="1" Color="#FF3A5BFF" />
                         </LinearGradientBrush>
                     </Border.Background>
@@ -28,15 +29,15 @@
                         <StackPanel Spacing="5">
                             <TextBlock
                                 CharacterSpacing="120"
-                                FontSize="11"
+                                FontSize="26"
                                 FontWeight="Bold"
-                                Foreground="#CCFFFFFF"
-                                Text="SENSORHUD" />
-                            <TextBlock
-                                FontSize="25"
-                                FontWeight="SemiBold"
                                 Foreground="White"
-                                Text="Make the overlay yours"
+                                Text="SensorHUD" />
+                            <TextBlock
+                                FontSize="18"
+                                FontWeight="SemiBold"
+                                Foreground="#CCFFFFFF"
+                                Text="Make the overlay yours."
                                 TextWrapping="Wrap" />
                         </StackPanel>
                         <Border
@@ -115,22 +116,12 @@
                                 Style="{StaticResource StatusValueStyle}"
                                 Text="{x:Bind ViewModel.Status.FrameCapture, Mode=OneWay}" />
                         </Grid>
-                        <Border
-                            Padding="12"
-                            Background="#26E5484D"
-                            CornerRadius="8"
-                            Visibility="{x:Bind ViewModel.Status.ErrorVisibility, Mode=OneWay}">
-                            <StackPanel Spacing="3">
-                                <TextBlock
-                                    FontWeight="SemiBold"
-                                    Foreground="#FFFF8B8F"
-                                    Text="Latest collector error" />
-                                <TextBlock
-                                    Opacity="0.85"
-                                    Text="{x:Bind ViewModel.Status.Error, Mode=OneWay}"
-                                    TextWrapping="Wrap" />
-                            </StackPanel>
-                        </Border>
+                        <muxc:InfoBar
+                            Title="Collector needs attention"
+                            IsClosable="False"
+                            IsOpen="{x:Bind ViewModel.Status.HasError, Mode=OneWay}"
+                            Message="{x:Bind ViewModel.Status.Error, Mode=OneWay}"
+                            Severity="Error" />
                     </StackPanel>
                 </Border>
 
@@ -142,81 +133,51 @@
                             <TextBlock Style="{StaticResource SectionDescriptionStyle}" Text="Control layout, background, and typography." />
                         </StackPanel>
                         <ComboBox
+                            HorizontalAlignment="Stretch"
                             Header="Layout"
                             ItemsSource="{x:Bind ViewModel.Layout.DirectionOptions, Mode=OneWay}"
-                            SelectedItem="{x:Bind ViewModel.Layout.Direction, Mode=TwoWay}"
-                            Style="{StaticResource SettingsComboBoxStyle}" />
+                            SelectedItem="{x:Bind ViewModel.Layout.Direction, Mode=TwoWay}" />
                         <TextBox
                             Description="Spacing is added automatically. Leave empty for a single space."
                             Header="Horizontal separator"
-                            Style="{StaticResource SettingsTextBoxStyle}"
                             Text="{x:Bind ViewModel.Layout.HorizontalSeparator, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <Grid ColumnSpacing="12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="52" />
-                            </Grid.ColumnDefinitions>
-                            <Slider
-                                Header="Background opacity"
-                                Maximum="{x:Bind ViewModel.Appearance.MaximumBackgroundOpacityPercent, Mode=OneTime}"
-                                Minimum="{x:Bind ViewModel.Appearance.MinimumBackgroundOpacityPercent, Mode=OneTime}"
-                                StepFrequency="1"
-                                Style="{StaticResource SettingsSliderStyle}"
-                                Value="{x:Bind ViewModel.Appearance.BackgroundOpacityPercent, Mode=TwoWay}" />
-                            <TextBlock
-                                Grid.Column="1"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Center"
-                                FontWeight="SemiBold"
-                                Text="{x:Bind ViewModel.Appearance.BackgroundOpacityText, Mode=OneWay}" />
-                        </Grid>
+                        <Slider
+                            Header="Background opacity"
+                            Maximum="{x:Bind ViewModel.Appearance.MaximumBackgroundOpacityPercent, Mode=OneTime}"
+                            Minimum="{x:Bind ViewModel.Appearance.MinimumBackgroundOpacityPercent, Mode=OneTime}"
+                            StepFrequency="1"
+                            Value="{x:Bind ViewModel.Appearance.BackgroundOpacityPercent, Mode=TwoWay}" />
                         <TextBox
                             Header="Font family"
                             PlaceholderText="Segoe UI"
-                            Style="{StaticResource SettingsTextBoxStyle}"
                             Text="{x:Bind ViewModel.Appearance.FontFamily, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        <StackPanel Spacing="4">
-                            <ComboBox
-                                Header="Font weight"
-                                ItemsSource="{x:Bind ViewModel.Appearance.FontWeightOptions, Mode=OneWay}"
-                                SelectedItem="{x:Bind ViewModel.Appearance.FontWeight, Mode=TwoWay}"
-                                Style="{StaticResource SettingsComboBoxStyle}" />
-                        </StackPanel>
-                        <Grid ColumnSpacing="12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="52" />
-                            </Grid.ColumnDefinitions>
-                            <Slider
-                                Header="Font size"
-                                Maximum="{x:Bind ViewModel.Appearance.MaximumFontSize, Mode=OneTime}"
-                                Minimum="{x:Bind ViewModel.Appearance.MinimumFontSize, Mode=OneTime}"
-                                StepFrequency="1"
-                                Style="{StaticResource SettingsSliderStyle}"
-                                Value="{x:Bind ViewModel.Appearance.FontSize, Mode=TwoWay}" />
-                            <TextBlock
-                                Grid.Column="1"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Center"
-                                FontWeight="SemiBold"
-                                Text="{x:Bind ViewModel.Appearance.FontSizeText, Mode=OneWay}" />
-                        </Grid>
+                        <ComboBox
+                            HorizontalAlignment="Stretch"
+                            Header="Font weight"
+                            ItemsSource="{x:Bind ViewModel.Appearance.FontWeightOptions, Mode=OneWay}"
+                            SelectedItem="{x:Bind ViewModel.Appearance.FontWeight, Mode=TwoWay}" />
+                        <Slider
+                            Header="Font size"
+                            Maximum="{x:Bind ViewModel.Appearance.MaximumFontSize, Mode=OneTime}"
+                            Minimum="{x:Bind ViewModel.Appearance.MinimumFontSize, Mode=OneTime}"
+                            StepFrequency="1"
+                            Value="{x:Bind ViewModel.Appearance.FontSize, Mode=TwoWay}" />
                         <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <ComboBox
+                                HorizontalAlignment="Stretch"
                                 Header="Horizontal text alignment"
                                 ItemsSource="{x:Bind ViewModel.Appearance.HorizontalTextAlignmentOptions, Mode=OneWay}"
-                                SelectedItem="{x:Bind ViewModel.Appearance.HorizontalTextAlignment, Mode=TwoWay}"
-                                Style="{StaticResource SettingsComboBoxStyle}" />
+                                SelectedItem="{x:Bind ViewModel.Appearance.HorizontalTextAlignment, Mode=TwoWay}" />
                             <ComboBox
                                 Grid.Column="1"
+                                HorizontalAlignment="Stretch"
                                 Header="Vertical text alignment"
                                 ItemsSource="{x:Bind ViewModel.Appearance.VerticalTextAlignmentOptions, Mode=OneWay}"
-                                SelectedItem="{x:Bind ViewModel.Appearance.VerticalTextAlignment, Mode=TwoWay}"
-                                Style="{StaticResource SettingsComboBoxStyle}" />
+                                SelectedItem="{x:Bind ViewModel.Appearance.VerticalTextAlignment, Mode=TwoWay}" />
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -258,8 +219,7 @@
                                         AutomationProperties.HelpText="Open metric settings"
                                         AutomationProperties.Name="{x:Bind Name}"
                                         Click="MetricCategoryButton_Click"
-                                        CornerRadius="6"
-                                        Style="{StaticResource SettingsActionButtonStyle}">
+                                        CornerRadius="6">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
                                             <TextBlock Text="{x:Bind MetricCountText}" />
                                             <FontIcon FontSize="12" Glyph="&#xE72A;" />
@@ -285,9 +245,12 @@
                         <Button
                             Grid.Column="1"
                             VerticalAlignment="Center"
-                            Click="ResetButton_Click"
-                            Content="Reset"
-                            Style="{StaticResource SettingsActionButtonStyle}" />
+                            Click="ResetButton_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon FontSize="14" Glyph="&#xE777;" />
+                                <TextBlock Text="Reset" />
+                            </StackPanel>
+                        </Button>
                     </Grid>
                 </Border>
 
@@ -305,7 +268,6 @@
 
         <viewModels:MetricEditorPanel
             x:Name="MetricEditor"
-            Canvas.ZIndex="10"
             Closed="MetricEditor_Closed"
             Opened="MetricEditor_Opened" />
     </Grid>

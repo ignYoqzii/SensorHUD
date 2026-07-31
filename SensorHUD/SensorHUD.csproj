@@ -8,6 +8,8 @@
     <SupportedOSPlatformVersion>10.0.18362.0</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
     <UseUwp>true</UseUwp>
+    <!-- Make UWP XAML discovery explicit for full command-line MSBuild builds. -->
+    <UseUwpTools>true</UseUwpTools>
     <!-- GitHub sideload releases currently target 64-bit Intel/AMD PCs. -->
     <Platforms>x64</Platforms>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
@@ -30,6 +32,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- WinUI 2 supplies modern Fluent controls while preserving the UWP
+         application model required by Xbox Game Bar. -->
+    <PackageReference Include="Microsoft.UI.Xaml" Version="2.8.7" />
+    <!-- SensorHUD does not use WinUI's optional WebView2 control. The desktop
+         WebView2 assets are incompatible with the modern .NET UWP compiler. -->
+    <PackageReference Include="Microsoft.Web.WebView2"
+                      Version="1.0.2849.39"
+                      IncludeAssets="none"
+                      PrivateAssets="all" />
     <!-- This is the official SDK used to host UWP XAML inside Xbox Game Bar. -->
     <PackageReference Include="Microsoft.Gaming.XboxGameBar"
                       Version="7.3.2607010"

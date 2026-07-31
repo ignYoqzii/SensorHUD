@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using SensorHUD.Core.Telemetry;
 using SensorHUD.Infrastructure;
-using Windows.UI.Xaml;
 
 namespace SensorHUD.Widgets.Settings;
 
@@ -55,15 +54,12 @@ public sealed class CollectorStatusViewModel : ObservableObject
         {
             if (SetProperty(ref _error, value))
             {
-                Notify(nameof(ErrorVisibility));
+                Notify(nameof(HasError));
             }
         }
     }
 
-    public Visibility ErrorVisibility =>
-        string.IsNullOrWhiteSpace(Error)
-            ? Visibility.Collapsed
-            : Visibility.Visible;
+    public bool HasError => !string.IsNullOrWhiteSpace(Error);
 
     internal void Update(
         CollectorConnectionStatus connection,
