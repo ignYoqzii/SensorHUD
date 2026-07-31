@@ -12,6 +12,7 @@ namespace SensorHUD.Core.Transport;
     UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
 [JsonSerializable(typeof(CollectorMessage))]
 [JsonSerializable(typeof(TelemetrySnapshot))]
+[JsonSerializable(typeof(MetricInstance))]
 public sealed partial class CollectorJsonContext : JsonSerializerContext
 {
 }

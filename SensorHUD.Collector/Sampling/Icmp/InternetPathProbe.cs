@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.NetworkInformation;
 
-namespace SensorHUD.Collector.Sampling.Network;
+namespace SensorHUD.Collector.Sampling.Icmp;
 
 /// <summary>
 /// Performs bounded, non-blocking ICMP probes against public anycast
@@ -25,7 +25,6 @@ internal sealed class InternetPathProbe : IDisposable
             new ProbeTargetState(address, MaximumResults))];
 
     private int _selectedTargetIndex = -1;
-    private int _selectionFailures;
     private bool _probeInProgress;
     private bool _disposed;
 
@@ -64,24 +63,14 @@ internal sealed class InternetPathProbe : IDisposable
         {
             if (_selectedTargetIndex < 0)
             {
-                return new InternetPathStatistics(
-                    null,
-                    null,
-                    _selectionFailures <
-                        FailuresBeforeReselection
-                        ? "Selecting an Internet probe endpoint."
-                        : "Public Internet probe endpoints are not responding.");
+                return new InternetPathStatistics(null, null);
             }
 
             ProbeTargetState target = _targets[_selectedTargetIndex];
             int totalCount = target.Results.Count;
             if (target.SuccessfulCount == 0)
             {
-                string error = totalCount <
-                    FailuresBeforeReselection
-                    ? "Waiting for an Internet probe response."
-                    : "Public Internet probe endpoints are not responding.";
-                return new InternetPathStatistics(null, null, error);
+                return new InternetPathStatistics(null, null);
             }
 
             double ping =
@@ -91,8 +80,7 @@ internal sealed class InternetPathProbe : IDisposable
                 totalCount;
             return new InternetPathStatistics(
                 ping,
-                packetLoss,
-                null);
+                packetLoss);
         }
     }
 
@@ -187,11 +175,6 @@ internal sealed class InternetPathProbe : IDisposable
                 }
 
                 _selectedTargetIndex = bestTargetIndex;
-                _selectionFailures = 0;
-            }
-            else
-            {
-                _selectionFailures++;
             }
         }
     }
@@ -290,5 +273,4 @@ internal sealed class InternetPathProbe : IDisposable
 /// </summary>
 internal readonly record struct InternetPathStatistics(
     double? PingMilliseconds,
-    double? PacketLossPercent,
-    string? Error);
+    double? PacketLossPercent);

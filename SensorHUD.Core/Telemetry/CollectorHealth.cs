@@ -11,18 +11,6 @@ public enum PawnIoState
 }
 
 /// <summary>
-/// Current state of ETW frame capture.
-/// </summary>
-public enum FrameCaptureState
-{
-    Starting,
-    WaitingForProcess,
-    WarmingUp,
-    Active,
-    Unavailable,
-}
-
-/// <summary>
 /// Small, non-sensitive health summary sent with telemetry samples.
 /// </summary>
 public sealed class CollectorHealth
@@ -35,19 +23,15 @@ public sealed class CollectorHealth
 
     public string? PawnIoError { get; set; }
 
-    public FrameCaptureState FrameCaptureState { get; set; }
+    /// <summary>
+    /// Gets or sets whether the collector's frame-capture subsystem is
+    /// actively consuming presentation events.
+    /// </summary>
+    public bool IsFrameCaptureActive { get; set; }
 
     /// <summary>
-    /// Process selected from recent presentation activity for frame
-    /// telemetry.
+    /// Gets or sets a coarse frame-capture subsystem failure, if any.
+    /// Metric availability remains represented only by reading absence.
     /// </summary>
-    public string? ForegroundProcess { get; set; }
-
     public string? FrameCaptureError { get; set; }
-
-    /// <summary>
-    /// The most recent unexpected provider failure. Individual unavailable
-    /// sensors continue to report their own errors on their readings.
-    /// </summary>
-    public string? LastProviderError { get; set; }
 }

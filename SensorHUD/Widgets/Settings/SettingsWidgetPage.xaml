@@ -108,12 +108,12 @@
                             <TextBlock
                                 Grid.Row="4"
                                 Style="{StaticResource StatusLabelStyle}"
-                                Text="Foreground process" />
+                                Text="Frame capture" />
                             <TextBlock
                                 Grid.Row="4"
                                 Grid.Column="1"
                                 Style="{StaticResource StatusValueStyle}"
-                                Text="{x:Bind ViewModel.Status.ForegroundProcess, Mode=OneWay}" />
+                                Text="{x:Bind ViewModel.Status.FrameCapture, Mode=OneWay}" />
                         </Grid>
                         <Border
                             Padding="12"

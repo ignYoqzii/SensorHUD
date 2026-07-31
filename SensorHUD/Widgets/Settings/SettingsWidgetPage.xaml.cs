@@ -207,16 +207,16 @@ public sealed partial class SettingsWidgetPage : Page
     private static string CreateDeviceSignature(
         TelemetrySnapshot? snapshot) => string.Join(
             "|",
-            (snapshot?.Readings ?? [])
-                .Where(reading =>
+            (snapshot?.Instances ?? [])
+                .Where(instance =>
                     MetricRegistry.TryGet(
-                        reading.MetricId,
+                        instance.MetricId,
                         out MetricDefinition definition) &&
                     definition.Scope == MetricScope.PerDevice &&
-                    !string.IsNullOrWhiteSpace(reading.DeviceId))
-                .Select(reading =>
-                    $"{reading.MetricId}\u001F{reading.DeviceId}\u001F" +
-                    reading.DeviceName)
+                    !string.IsNullOrWhiteSpace(instance.DeviceId))
+                .Select(instance =>
+                    $"{instance.MetricId}\u001F{instance.DeviceId}\u001F" +
+                    instance.DeviceName)
                 .Distinct(StringComparer.Ordinal)
                 .Order(StringComparer.Ordinal));
 }

@@ -39,7 +39,6 @@ internal sealed class TelemetryRenderer(
             UpdateValues(model);
         }
 
-        UpdateTooltips(model, settings.Layout.Direction);
         bool horizontal =
             settings.Layout.Direction == WidgetLayout.Horizontal;
         horizontalText.Visibility =
@@ -164,42 +163,6 @@ internal sealed class TelemetryRenderer(
                  index++)
             {
                 node.Runs[index].Text = metric.Parts[index].Text;
-            }
-        }
-    }
-
-    private void UpdateTooltips(
-        TelemetryDisplayModel model,
-        WidgetLayout layout)
-    {
-        if (layout == WidgetLayout.Horizontal)
-        {
-            List<string>? errors = null;
-            foreach (PresentedMetric metric in model.Metrics)
-            {
-                if (!string.IsNullOrWhiteSpace(metric.Reading?.Error))
-                {
-                    errors ??= [];
-                    errors.Add(
-                        $"{metric.Definition.Name}: {metric.Reading.Error}");
-                }
-            }
-
-            ToolTipService.SetToolTip(
-                horizontalText,
-                errors is null
-                    ? null
-                    : string.Join(Environment.NewLine, errors));
-            return;
-        }
-
-        foreach (PresentedMetric metric in model.Metrics)
-        {
-            if (_nodes.TryGetValue(metric.Key, out RenderNode? node))
-            {
-                ToolTipService.SetToolTip(
-                    node.Target,
-                    metric.Reading?.Error);
             }
         }
     }

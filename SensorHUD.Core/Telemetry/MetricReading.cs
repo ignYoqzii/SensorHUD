@@ -1,18 +1,16 @@
 namespace SensorHUD.Core.Telemetry;
 
 /// <summary>
-/// One numeric reading published by a collector provider. Presentation
+/// One available numeric reading published by the collector. Presentation
 /// metadata belongs to the metric registry rather than the wire payload.
 /// </summary>
 public sealed class MetricReading
 {
-    public string MetricId { get; set; } = string.Empty;
+    public required string MetricId { get; set; }
 
     public string? DeviceId { get; set; }
 
     public string? DeviceName { get; set; }
 
-    public double? Value { get; set; }
-
-    public string? Error { get; set; }
+    public required double Value { get; set; }
 }

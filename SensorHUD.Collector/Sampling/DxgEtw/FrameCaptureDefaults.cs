@@ -1,4 +1,4 @@
-namespace SensorHUD.Collector.Sampling.Frames;
+namespace SensorHUD.Collector.Sampling.DxgEtw;
 
 /// <summary>
 /// ETW identifiers, time windows, and process exclusions for frame capture.

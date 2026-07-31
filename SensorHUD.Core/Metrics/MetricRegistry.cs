@@ -7,29 +7,12 @@ using System.Linq;
 namespace SensorHUD.Core.Metrics;
 
 /// <summary>
-/// Central source of truth for metric categories and metrics. The settings UI
-/// and telemetry presenter are generated from this metadata.
+/// Central source of truth for metric categories and metrics. Provider-owned
+/// declaration files contribute definitions; settings and presentation
+/// consume one flattened, provider-neutral registry.
 /// </summary>
-public static class MetricRegistry
+public static partial class MetricRegistry
 {
-    public const string Fps = "fps";
-    public const string OnePercentLow = "fps.onePercentLow";
-    public const string Frametime = "fps.frametime";
-    public const string CpuUsage = "cpu.usage";
-    public const string CpuTemperature = "cpu.temperature";
-    public const string GpuUsage = "gpu.usage";
-    public const string GpuTemperature = "gpu.temperature";
-    public const string GpuVramUsage = "gpu.vramUsage";
-    public const string GpuVramUsed = "gpu.vramUsed";
-    public const string GpuVramTotal = "gpu.vramTotal";
-    public const string MemoryUsage = "memory.usage";
-    public const string MemoryUsed = "memory.used";
-    public const string MemoryTotal = "memory.total";
-    public const string NetworkSend = "network.send";
-    public const string NetworkReceive = "network.receive";
-    public const string Ping = "network.ping";
-    public const string PacketLoss = "network.packetLoss";
-
     private static readonly MetricCategoryDefinition[] CategoryDefinitions =
         [
             new()
@@ -79,219 +62,12 @@ public static class MetricRegistry
     private static readonly IReadOnlyList<MetricDefinition>
         OrderedDefinitions = new ReadOnlyCollection<MetricDefinition>(
         [
-            new()
-            {
-                Id = Fps,
-                Category = MetricCategory.FrameRate,
-                Name = "FPS",
-                Unit = "FPS",
-                Format = "{name}: {value} {unit}",
-                Decimals = 0,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                SortOrder = 0,
-            },
-            new()
-            {
-                Id = OnePercentLow,
-                Category = MetricCategory.FrameRate,
-                Name = "1% Low",
-                Unit = "FPS",
-                Format = "{name}: {value} {unit}",
-                Decimals = 0,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                SortOrder = 1,
-            },
-            new()
-            {
-                Id = Frametime,
-                Category = MetricCategory.FrameRate,
-                Name = "Frametime",
-                Unit = "ms",
-                Format = "{name}: {value} {unit}",
-                Decimals = 1,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                SortOrder = 2,
-            },
-            new()
-            {
-                Id = CpuUsage,
-                Category = MetricCategory.Cpu,
-                Name = "Usage",
-                Unit = "%",
-                Format = "{device} Usage: {value}{unit}",
-                Decimals = 0,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                SortOrder = 0,
-            },
-            new()
-            {
-                Id = CpuTemperature,
-                Category = MetricCategory.Cpu,
-                Name = "Temperature",
-                Unit = "°C",
-                Format = "{device} Temp: {value}{unit}",
-                Decimals = 0,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                SortOrder = 1,
-            },
-            new()
-            {
-                Id = GpuUsage,
-                Category = MetricCategory.Gpu,
-                Name = "Usage",
-                Unit = "%",
-                Format = "{device} Usage: {value}{unit}",
-                Decimals = 0,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                SortOrder = 0,
-                Scope = MetricScope.PerDevice,
-            },
-            new()
-            {
-                Id = GpuTemperature,
-                Category = MetricCategory.Gpu,
-                Name = "Temperature",
-                Unit = "°C",
-                Format = "{device} Temp: {value}{unit}",
-                Decimals = 0,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                SortOrder = 1,
-                Scope = MetricScope.PerDevice,
-            },
-            new()
-            {
-                Id = GpuVramUsage,
-                Category = MetricCategory.Gpu,
-                Name = "VRAM Usage",
-                Unit = "%",
-                Format = "{device} VRAM: {value}{unit}",
-                Decimals = 0,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                SortOrder = 2,
-                Scope = MetricScope.PerDevice,
-            },
-            new()
-            {
-                Id = GpuVramUsed,
-                Category = MetricCategory.Gpu,
-                Name = "VRAM Used",
-                Unit = "GB",
-                Format = "{device} VRAM Used: {value} {unit}",
-                Decimals = 1,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                IsVisibleByDefault = false,
-                SortOrder = 3,
-                Scope = MetricScope.PerDevice,
-            },
-            new()
-            {
-                Id = GpuVramTotal,
-                Category = MetricCategory.Gpu,
-                Name = "VRAM Total",
-                Unit = "GB",
-                Format = "{device} VRAM Total: {value} {unit}",
-                Decimals = 1,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                IsVisibleByDefault = false,
-                SortOrder = 4,
-                Scope = MetricScope.PerDevice,
-            },
-            new()
-            {
-                Id = MemoryUsage,
-                Category = MetricCategory.Memory,
-                Name = "Usage",
-                Unit = "%",
-                Format = "{device} Usage: {value}{unit}",
-                Decimals = 0,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                SortOrder = 0,
-            },
-            new()
-            {
-                Id = MemoryUsed,
-                Category = MetricCategory.Memory,
-                Name = "Used",
-                Unit = "GB",
-                Format = "{device} Used: {value} {unit}",
-                Decimals = 1,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                IsVisibleByDefault = false,
-                SortOrder = 1,
-            },
-            new()
-            {
-                Id = MemoryTotal,
-                Category = MetricCategory.Memory,
-                Name = "Total",
-                Unit = "GB",
-                Format = "{device} Total: {value} {unit}",
-                Decimals = 1,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                IsVisibleByDefault = false,
-                SortOrder = 2,
-            },
-            new()
-            {
-                Id = NetworkSend,
-                Category = MetricCategory.Network,
-                Name = "Send",
-                Unit = "Mbps",
-                Format = "↑ {value} {unit}",
-                Decimals = 1,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                SortOrder = 0,
-            },
-            new()
-            {
-                Id = NetworkReceive,
-                Category = MetricCategory.Network,
-                Name = "Receive",
-                Unit = "Mbps",
-                Format = "↓ {value} {unit}",
-                Decimals = 1,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                SortOrder = 1,
-            },
-            new()
-            {
-                Id = Ping,
-                Category = MetricCategory.Network,
-                Name = "Ping",
-                Unit = "ms",
-                Format = "{name}: {value} {unit}",
-                Decimals = 0,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                SortOrder = 2,
-            },
-            new()
-            {
-                Id = PacketLoss,
-                Category = MetricCategory.Network,
-                Name = "Packet Loss",
-                Unit = "%",
-                Format = "{name}: {value}{unit}",
-                Decimals = 1,
-                TextColor = "#FFFFFFFF",
-                ValueUnitColor = "#FFFFFFFF",
-                SortOrder = 3,
-            },
+            .. CreateFrameRateDefinitions(),
+            .. CreateCpuDefinitions(),
+            .. CreateGpuDefinitions(),
+            .. CreateMemoryDefinitions(),
+            .. CreateNetworkAdapterDefinitions(),
+            .. CreateInternetPathDefinitions(),
         ]);
 
     private static readonly ReadOnlyDictionary<MetricCategory,

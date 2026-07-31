@@ -1,79 +1,101 @@
 using SensorHUD.Collector.Bootstrap;
-using SensorHUD.Collector.Sampling.Frames;
-using SensorHUD.Collector.Sampling.Hardware;
-using SensorHUD.Collector.Sampling.Network;
+using SensorHUD.Collector.Sampling.DxgEtw;
+using SensorHUD.Collector.Sampling.Icmp;
+using SensorHUD.Collector.Sampling.LibreHardwareMonitor;
+using SensorHUD.Collector.Sampling.WindowsMemory;
 using SensorHUD.Core.Telemetry;
 
 namespace SensorHUD.Collector.Sampling;
 
 /// <summary>
-/// Coordinates independent providers and creates transport-ready snapshots.
-/// It has no knowledge of process activation, named pipes, or XAML.
+/// Coordinates independent source providers and creates transport-ready
+/// snapshots. Provider registration is explicit and provider failures never
+/// cross the UI-facing telemetry contract.
 /// </summary>
 internal sealed class TelemetrySampler : IDisposable
 {
     private readonly PawnIoDependency.PawnIoResult _pawnIo;
-    private readonly FrameMetricsProvider _frames;
-    private readonly ITelemetryProvider[] _providers;
+    private readonly IMetricProvider[] _providers;
+    private readonly DxgEtwMetricProvider? _frameCapture;
+    private readonly string? _frameCaptureStartupError;
 
     private TelemetrySampler(
         PawnIoDependency.PawnIoResult pawnIo,
-        FrameMetricsProvider frames,
-        params ITelemetryProvider[] providers)
+        IMetricProvider[] providers,
+        DxgEtwMetricProvider? frameCapture,
+        string? frameCaptureStartupError)
     {
         _pawnIo = pawnIo;
-        _frames = frames;
         _providers = providers;
+        _frameCapture = frameCapture;
+        _frameCaptureStartupError = frameCaptureStartupError;
     }
 
     /// <summary>
-    /// Registers the production hardware sources in one obvious location.
-    /// Adding a source requires implementing <see cref="ITelemetryProvider"/>
-    /// and adding it to this list.
+    /// Central, explicit production registration. Guarded construction keeps
+    /// one unavailable source from suppressing unrelated providers.
     /// </summary>
     public static TelemetrySampler CreateDefault(
         PawnIoDependency.PawnIoResult pawnIo)
     {
-        HardwareMetricsProvider hardware =
-            new(pawnIo.Error);
-        FrameMetricsProvider frames = new();
-        InternetConnectionMetricsProvider internetConnection = new();
+        List<IMetricProvider> providers = [];
+        HashSet<string> claimedMetrics = new(StringComparer.Ordinal);
+
+        DxgEtwMetricProvider? frames = TryRegister(
+            providers,
+            claimedMetrics,
+            static () => new DxgEtwMetricProvider(),
+            out string? frameStartupError);
+        _ = TryRegister(
+            providers,
+            claimedMetrics,
+            static () => new LibreHardwareMonitorMetricProvider(),
+            out _);
+        _ = TryRegister(
+            providers,
+            claimedMetrics,
+            static () => new WindowsMemoryMetricProvider(),
+            out _);
+        _ = TryRegister(
+            providers,
+            claimedMetrics,
+            static () => new IcmpMetricProvider(),
+            out _);
+
         return new TelemetrySampler(
             pawnIo,
+            [.. providers],
             frames,
-            hardware,
-            frames,
-            internetConnection);
+            frameStartupError);
     }
 
     public TelemetrySnapshot Sample()
     {
+        List<MetricInstance> instances = new(16);
         List<MetricReading> readings = new(32);
-        string? lastProviderError = null;
 
-        foreach (ITelemetryProvider provider in _providers)
+        foreach (IMetricProvider provider in _providers)
         {
-            int firstProviderReading = readings.Count;
             try
             {
-                provider.Sample(readings);
+                MetricSampleSink sink = new(provider.Metrics);
+                provider.Sample(sink);
+                sink.CommitTo(instances, readings);
             }
-            catch (Exception exception)
+            catch
             {
-                readings.RemoveRange(
-                    firstProviderReading,
-                    readings.Count - firstProviderReading);
-                // One unexpected source failure is reported in health but does
-                // not suppress independent hardware or frame sources.
-                lastProviderError =
-                    $"{provider.Name}: {exception.Message}";
+                // The failing source batch is discarded. Other registered
+                // providers continue and no provider detail crosses the pipe.
             }
         }
 
-        FrameProviderStatus frameStatus = _frames.Status;
+        FrameCaptureSubsystemHealth frameHealth =
+            _frameCapture?.CaptureHealth ??
+            new(false, _frameCaptureStartupError);
         return new TelemetrySnapshot
         {
             CapturedAtUtc = DateTimeOffset.UtcNow,
+            Instances = instances,
             Readings = readings,
             Health = new CollectorHealth
             {
@@ -81,17 +103,15 @@ internal sealed class TelemetrySampler : IDisposable
                 PawnIoState = _pawnIo.State,
                 PawnIoVersion = _pawnIo.Version,
                 PawnIoError = _pawnIo.Error,
-                FrameCaptureState = frameStatus.State,
-                ForegroundProcess = frameStatus.TargetProcess,
-                FrameCaptureError = frameStatus.Error,
-                LastProviderError = lastProviderError,
+                IsFrameCaptureActive = frameHealth.IsActive,
+                FrameCaptureError = frameHealth.Error,
             },
         };
     }
 
     public void Dispose()
     {
-        foreach (ITelemetryProvider provider in _providers)
+        foreach (IMetricProvider provider in _providers)
         {
             if (provider is IDisposable disposable)
             {
@@ -105,6 +125,56 @@ internal sealed class TelemetrySampler : IDisposable
                     // release its resources during process teardown.
                 }
             }
+        }
+    }
+
+    private static TProvider? TryRegister<TProvider>(
+        ICollection<IMetricProvider> providers,
+        ISet<string> claimedMetrics,
+        Func<TProvider> factory,
+        out string? error)
+        where TProvider : class, IMetricProvider
+    {
+        TProvider? provider = null;
+        try
+        {
+            provider = factory();
+            _ = new MetricSampleSink(provider.Metrics);
+            HashSet<string> newClaims = new(StringComparer.Ordinal);
+            foreach (ProvidedMetricDefinition metric in provider.Metrics)
+            {
+                if (!newClaims.Add(metric.MetricId) ||
+                    claimedMetrics.Contains(metric.MetricId))
+                {
+                    throw new InvalidOperationException(
+                        $"Metric '{metric.MetricId}' has multiple providers.");
+                }
+            }
+
+            foreach (string metricId in newClaims)
+            {
+                claimedMetrics.Add(metricId);
+            }
+
+            providers.Add(provider);
+            error = null;
+            return provider;
+        }
+        catch (Exception exception)
+        {
+            if (provider is IDisposable disposable)
+            {
+                try
+                {
+                    disposable.Dispose();
+                }
+                catch
+                {
+                }
+            }
+
+            error = exception.Message;
+            return null;
         }
     }
 }

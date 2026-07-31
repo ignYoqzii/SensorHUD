@@ -16,6 +16,22 @@ public sealed class MetricRegistryTests
     }
 
     [Fact]
+    public void AllFiveCategoriesRemainRegistryDriven()
+    {
+        Assert.Equal(
+            [
+                MetricCategory.FrameRate,
+                MetricCategory.Cpu,
+                MetricCategory.Gpu,
+                MetricCategory.Memory,
+                MetricCategory.Network,
+            ],
+            MetricRegistry.Categories.Select(category => category.Id));
+
+        Assert.Equal(17, MetricRegistry.All.Count);
+    }
+
+    [Fact]
     public void CategoryQueriesReturnOnlyRequestedScopeInDisplayOrder()
     {
         HashSet<string> indexedMetricIds =

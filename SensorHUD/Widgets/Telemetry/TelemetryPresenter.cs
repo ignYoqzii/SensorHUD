@@ -8,8 +8,9 @@ using SensorHUD.Infrastructure;
 namespace SensorHUD.Widgets.Telemetry;
 
 /// <summary>
-/// Joins readings, registry definitions, user settings, and frontend
-/// connection state into an ordered display model.
+/// Builds stable presentation slots from registry definitions, settings, and
+/// declared devices, then joins currently available readings into those
+/// slots. Reading absence changes only the displayed value.
 /// </summary>
 internal static class TelemetryPresenter
 {
@@ -18,77 +19,47 @@ internal static class TelemetryPresenter
         TelemetrySnapshot? snapshot,
         CollectorConnectionStatus connection)
     {
-        Dictionary<string, MetricReading> globalReadings =
-            new(StringComparer.Ordinal);
-        Dictionary<(string MetricId, string DeviceId), MetricReading>
-            deviceReadings = [];
-        Dictionary<(MetricCategory Category, string DeviceId), string?>
-            devices = [];
+        Dictionary<string, MetricReading> readings =
+            IndexReadings(snapshot);
+        Dictionary<string, MetricInstance> instances =
+            IndexInstances(snapshot);
+        List<PresentedMetric> metrics = new(
+            MetricRegistry.All.Count + instances.Count);
 
-        foreach (MetricReading reading in snapshot?.Readings ?? [])
+        foreach (MetricDefinition definition in MetricRegistry.All)
         {
-            if (!MetricRegistry.TryGet(
-                    reading.MetricId,
-                    out MetricDefinition definition))
+            if (definition.Scope != MetricScope.Global)
             {
                 continue;
             }
 
-            if (definition.Scope == MetricScope.PerDevice)
-            {
-                if (string.IsNullOrWhiteSpace(reading.DeviceId))
-                {
-                    continue;
-                }
-
-                // The latest duplicate wins. A malformed provider can affect
-                // one instance without crashing the entire overlay.
-                deviceReadings[(reading.MetricId, reading.DeviceId)] =
-                    reading;
-                devices[(definition.Category, reading.DeviceId)] =
-                    reading.DeviceName;
-            }
-            else
-            {
-                globalReadings[reading.MetricId] = reading;
-            }
+            string key = definition.Id;
+            readings.TryGetValue(key, out MetricReading? reading);
+            AddSlot(
+                metrics,
+                settings,
+                key,
+                definition,
+                reading?.DeviceName,
+                reading?.Value);
         }
 
-        List<PresentedMetric> metrics = new(MetricRegistry.All.Count);
-        foreach (MetricDefinition definition in MetricRegistry.All)
+        foreach ((string key, MetricInstance instance) in instances)
         {
-            if (definition.Scope == MetricScope.PerDevice)
-            {
-                foreach (((MetricCategory category, string deviceId),
-                         string? deviceName) in devices)
-                {
-                    if (category != definition.Category)
-                    {
-                        continue;
-                    }
-
-                    if (!deviceReadings.TryGetValue(
-                            (definition.Id, deviceId),
-                            out MetricReading? reading))
-                    {
-                        reading = new MetricReading
-                        {
-                            MetricId = definition.Id,
-                            DeviceId = deviceId,
-                            DeviceName = deviceName,
-                        };
-                    }
-
-                    AddMetric(metrics, definition, reading, settings);
-                }
-            }
-            else
-            {
-                globalReadings.TryGetValue(
-                    definition.Id,
-                    out MetricReading? reading);
-                AddMetric(metrics, definition, reading, settings);
-            }
+            MetricDefinition definition =
+                MetricRegistry.Get(instance.MetricId);
+            readings.TryGetValue(key, out MetricReading? reading);
+            string? deviceName =
+                string.IsNullOrWhiteSpace(instance.DeviceName)
+                    ? reading?.DeviceName
+                    : instance.DeviceName;
+            AddSlot(
+                metrics,
+                settings,
+                key,
+                definition,
+                deviceName,
+                reading?.Value);
         }
 
         metrics.Sort(CompareMetrics);
@@ -97,14 +68,84 @@ internal static class TelemetryPresenter
             GetStatusText(connection, snapshot));
     }
 
-    private static void AddMetric(
-        List<PresentedMetric> target,
-        MetricDefinition definition,
-        MetricReading? reading,
-        WidgetSettings settings)
+    private static Dictionary<string, MetricReading> IndexReadings(
+        TelemetrySnapshot? snapshot)
     {
-        string key =
-            MetricInstanceKey.Create(definition, reading?.DeviceId);
+        Dictionary<string, MetricReading> result =
+            new(StringComparer.Ordinal);
+        foreach (MetricReading reading in snapshot?.Readings ?? [])
+        {
+            if (!MetricRegistry.TryGet(
+                    reading.MetricId,
+                    out MetricDefinition definition) ||
+                !double.IsFinite(reading.Value))
+            {
+                continue;
+            }
+
+            string key;
+            if (definition.Scope == MetricScope.PerDevice)
+            {
+                if (string.IsNullOrWhiteSpace(reading.DeviceId))
+                {
+                    continue;
+                }
+
+                key = MetricInstanceKey.Create(
+                    definition,
+                    reading.DeviceId);
+            }
+            else
+            {
+                if (!string.IsNullOrWhiteSpace(reading.DeviceId))
+                {
+                    continue;
+                }
+
+                key = definition.Id;
+            }
+
+            // The latest malformed duplicate wins without affecting any
+            // other presentation slot.
+            result[key] = reading;
+        }
+
+        return result;
+    }
+
+    private static Dictionary<string, MetricInstance> IndexInstances(
+        TelemetrySnapshot? snapshot)
+    {
+        Dictionary<string, MetricInstance> result =
+            new(StringComparer.Ordinal);
+        foreach (MetricInstance instance in snapshot?.Instances ?? [])
+        {
+            if (!MetricRegistry.TryGet(
+                    instance.MetricId,
+                    out MetricDefinition definition) ||
+                definition.Scope != MetricScope.PerDevice ||
+                string.IsNullOrWhiteSpace(instance.DeviceId))
+            {
+                continue;
+            }
+
+            string key = MetricInstanceKey.Create(
+                definition,
+                instance.DeviceId);
+            result[key] = instance;
+        }
+
+        return result;
+    }
+
+    private static void AddSlot(
+        ICollection<PresentedMetric> target,
+        WidgetSettings settings,
+        string key,
+        MetricDefinition definition,
+        string? deviceName,
+        double? value)
+    {
         settings.MetricOverrides.TryGetValue(
             key,
             out MetricOverrides? overrides);
@@ -116,12 +157,19 @@ internal static class TelemetryPresenter
         target.Add(new PresentedMetric(
             key,
             definition,
-            reading,
+            deviceName,
+            value,
             overrides,
-            MetricFormatter.Format(definition, reading, overrides)));
+            MetricFormatter.Format(
+                definition,
+                value,
+                deviceName,
+                overrides)));
     }
 
-    private static int CompareMetrics(PresentedMetric left, PresentedMetric right)
+    private static int CompareMetrics(
+        PresentedMetric left,
+        PresentedMetric right)
     {
         int category = MetricRegistry.GetCategory(
                 left.Definition.Category).SortOrder
@@ -134,8 +182,8 @@ internal static class TelemetryPresenter
         }
 
         int device = string.Compare(
-            left.Reading?.DeviceName,
-            right.Reading?.DeviceName,
+            left.DeviceName,
+            right.DeviceName,
             StringComparison.CurrentCultureIgnoreCase);
         return device != 0
             ? device
@@ -158,12 +206,13 @@ internal static class TelemetryPresenter
 }
 
 /// <summary>
-/// One metric instance ready for XAML rendering.
+/// One stable registry or declared-device slot ready for XAML rendering.
 /// </summary>
 internal readonly record struct PresentedMetric(
     string Key,
     MetricDefinition Definition,
-    MetricReading? Reading,
+    string? DeviceName,
+    double? Value,
     MetricOverrides? Overrides,
     IReadOnlyList<MetricTextPart> Parts);
 

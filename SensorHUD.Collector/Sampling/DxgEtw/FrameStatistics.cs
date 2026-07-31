@@ -1,6 +1,6 @@
 using System.Buffers;
 
-namespace SensorHUD.Collector.Sampling.Frames;
+namespace SensorHUD.Collector.Sampling.DxgEtw;
 
 /// <summary>
 /// Performs frame calculations without ETW, process, transport, or UI

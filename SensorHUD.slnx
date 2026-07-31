@@ -7,6 +7,9 @@
   <Project Path="SensorHUD.Collector/SensorHUD.Collector.csproj">
     <Platform Solution="*|x64" Project="x64" />
   </Project>
+  <Project Path="SensorHUD.Collector.Tests/SensorHUD.Collector.Tests.csproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
   <Project Path="SensorHUD/SensorHUD.csproj">
     <Platform Solution="*|x64" Project="x64" />
     <Deploy />

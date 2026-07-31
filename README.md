@@ -260,8 +260,9 @@ Recurring work is intentionally bounded:
 - The widget reuses existing XAML elements when structure is unchanged.
 - A failed provider does not suppress independent metrics.
 
-Settings use the current schema without a legacy migration layer. Unknown
-properties or invalid values fall back safely to current defaults.
+Settings use the current schema without a migration layer. Unknown properties
+or invalid JSON reset the file to current defaults; valid current-schema
+values are normalized to supported ranges.
 
 ## Documentation
 

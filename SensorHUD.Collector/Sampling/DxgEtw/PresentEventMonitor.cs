@@ -2,9 +2,8 @@ using System.Diagnostics;
 using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Session;
 using SensorHUD.Collector.Transport;
-using SensorHUD.Core.Telemetry;
 
-namespace SensorHUD.Collector.Sampling.Frames;
+namespace SensorHUD.Collector.Sampling.DxgEtw;
 
 /// <summary>
 /// Owns the DXG ETW session, presentation retention, process selection,
@@ -23,7 +22,8 @@ internal sealed class PresentEventMonitor : IDisposable
     private readonly Thread _processingThread;
 
     private TraceEventSession? _session;
-    private FrameCaptureState _traceState = FrameCaptureState.Starting;
+    private FrameCaptureSessionState _traceState =
+        FrameCaptureSessionState.Starting;
     private string? _traceError;
     private int _disposeState;
 
@@ -35,6 +35,21 @@ internal sealed class PresentEventMonitor : IDisposable
             Name = "SensorHUD frame trace",
         };
         _processingThread.Start();
+    }
+
+    public FrameCaptureSubsystemHealth CaptureHealth
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return new FrameCaptureSubsystemHealth(
+                    _traceState == FrameCaptureSessionState.Active,
+                    _traceState == FrameCaptureSessionState.Unavailable
+                        ? _traceError
+                        : null);
+            }
+        }
     }
 
     /// <summary>
@@ -53,14 +68,10 @@ internal sealed class PresentEventMonitor : IDisposable
             RemoveExpired(retentionCutoff);
 
             if (_traceState is
-                FrameCaptureState.Starting or
-                FrameCaptureState.Unavailable)
+                FrameCaptureSessionState.Starting or
+                FrameCaptureSessionState.Unavailable)
             {
-                return new FrameCaptureWindow(
-                    _traceState,
-                    null,
-                    [],
-                    _traceError ?? "Starting frame trace.");
+                return new FrameCaptureWindow([]);
             }
 
             int? processId = ChooseTargetProcess(
@@ -68,33 +79,14 @@ internal sealed class PresentEventMonitor : IDisposable
                 out int recentCount);
             if (processId is null)
             {
-                return new FrameCaptureWindow(
-                    FrameCaptureState.WaitingForProcess,
-                    null,
-                    [],
-                    "No presenting process has been detected yet.");
-            }
-
-            string? processName =
-                _processNameCache.GetValueOrDefault(processId.Value);
-            if (string.IsNullOrWhiteSpace(processName))
-            {
-                processName = $"PID {processId.Value}";
+                return new FrameCaptureWindow([]);
             }
 
             double[] timestamps = CopyRecent(
                 _presentsByProcess[processId.Value],
                 calculationCutoff,
                 recentCount);
-            return new FrameCaptureWindow(
-                timestamps.Length < 2
-                    ? FrameCaptureState.WarmingUp
-                    : FrameCaptureState.Active,
-                processName,
-                timestamps,
-                timestamps.Length < 2
-                    ? "Waiting for enough frame samples."
-                    : null);
+            return new FrameCaptureWindow(timestamps);
         }
     }
 
@@ -161,7 +153,7 @@ internal sealed class PresentEventMonitor : IDisposable
 
                 lock (_sync)
                 {
-                    _traceState = FrameCaptureState.WaitingForProcess;
+                    _traceState = FrameCaptureSessionState.Active;
                     _traceError = null;
                 }
 
@@ -188,6 +180,16 @@ internal sealed class PresentEventMonitor : IDisposable
         finally
         {
             Volatile.Write(ref _session, null);
+            lock (_sync)
+            {
+                if (!IsDisposed &&
+                    _traceState == FrameCaptureSessionState.Active)
+                {
+                    _traceState = FrameCaptureSessionState.Unavailable;
+                    _traceError =
+                        "Frame capture stopped unexpectedly.";
+                }
+            }
         }
     }
 
@@ -374,7 +376,7 @@ internal sealed class PresentEventMonitor : IDisposable
     {
         lock (_sync)
         {
-            _traceState = FrameCaptureState.Unavailable;
+            _traceState = FrameCaptureSessionState.Unavailable;
             _traceError = error;
         }
     }
@@ -389,7 +391,11 @@ internal sealed class PresentEventMonitor : IDisposable
 /// Immutable ETW capture passed to the frame calculation layer.
 /// </summary>
 internal readonly record struct FrameCaptureWindow(
-    FrameCaptureState State,
-    string? TargetProcess,
-    double[] PresentationTimestamps,
-    string? Error);
+    double[] PresentationTimestamps);
+
+internal enum FrameCaptureSessionState
+{
+    Starting,
+    Active,
+    Unavailable,
+}

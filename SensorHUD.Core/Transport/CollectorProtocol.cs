@@ -8,10 +8,10 @@ namespace SensorHUD.Core.Transport;
 /// </summary>
 public static class CollectorProtocol
 {
-    public const int Version = 1;
+    public const int Version = 2;
     public const string FullTrustGroup = "Collector";
     public const string SemaphoreName = @"Local\SensorHUD.Collector";
-    public const string PipeName = @"LOCAL\SensorHUD.Telemetry.v1";
+    public const string PipeName = @"LOCAL\SensorHUD.Telemetry.v2";
     public const int MaximumMessageBytes = 1024 * 1024;
     public const int AttemptsBeforeUnavailable = 8;
 

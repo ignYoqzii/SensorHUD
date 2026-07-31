@@ -13,5 +13,7 @@ public sealed class TelemetrySnapshot
 
     public required CollectorHealth Health { get; set; }
 
+    public required List<MetricInstance> Instances { get; set; }
+
     public required List<MetricReading> Readings { get; set; }
 }

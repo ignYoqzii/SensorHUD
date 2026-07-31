@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using SensorHUD.Core.Settings;
-using SensorHUD.Core.Telemetry;
 
 namespace SensorHUD.Core.Metrics;
 
@@ -39,11 +38,14 @@ public static class MetricFormatter
     private static readonly string[] NumericFormats = ["F0", "F1", "F2"];
 
     /// <summary>
-    /// Formats one reading while preserving semantic value and unit parts.
+    /// Formats one presentation slot while preserving semantic value and unit
+    /// parts. A missing value becomes a frontend-only placeholder and is never
+    /// serialized as telemetry.
     /// </summary>
     public static IReadOnlyList<MetricTextPart> Format(
         MetricDefinition definition,
-        MetricReading? reading,
+        double? value,
+        string? deviceName,
         MetricOverrides? overrides)
     {
         ArgumentNullException.ThrowIfNull(definition);
@@ -52,14 +54,14 @@ public static class MetricFormatter
             ? definition.Format
             : overrides.Format;
         int decimals = overrides?.Decimals ?? definition.Decimals;
-        string numericValue = reading?.Value is double value
-            ? value.ToString(
+        string numericValue = value is double available
+            ? available.ToString(
                 GetNumericFormat(decimals),
                 CultureInfo.CurrentCulture)
             : "N/A";
-        string deviceName = string.IsNullOrWhiteSpace(reading?.DeviceName)
+        string resolvedDeviceName = string.IsNullOrWhiteSpace(deviceName)
             ? GetFallbackDeviceName(definition.Category)
-            : reading.DeviceName;
+            : deviceName;
 
         List<MetricTextPart> parts = new(4);
         int position = 0;
@@ -90,7 +92,11 @@ public static class MetricFormatter
             Add(parts, format[position..nextIndex], MetricTextRole.Text);
             Add(
                 parts,
-                Replace(next.Text, definition, numericValue, deviceName),
+                Replace(
+                    next.Text,
+                    definition,
+                    numericValue,
+                    resolvedDeviceName),
                 next.Role);
             position = nextIndex + next.Text.Length;
         }

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using SensorHUD.Core.Telemetry;
 using SensorHUD.Infrastructure;
 using Windows.UI.Xaml;
@@ -14,7 +15,7 @@ public sealed class CollectorStatusViewModel : ObservableObject
     private string _lastSnapshot = "Waiting";
     private string _administrator = "Unknown";
     private string _pawnIo = "Unknown";
-    private string _foregroundProcess = "Waiting";
+    private string _frameCapture = "Inactive";
     private string? _error;
 
     public string Connection
@@ -41,13 +42,10 @@ public sealed class CollectorStatusViewModel : ObservableObject
         private set => SetProperty(ref _pawnIo, value);
     }
 
-    /// <summary>
-    /// Gets the process selected from current presentation activity.
-    /// </summary>
-    public string ForegroundProcess
+    public string FrameCapture
     {
-        get => _foregroundProcess;
-        private set => SetProperty(ref _foregroundProcess, value);
+        get => _frameCapture;
+        private set => SetProperty(ref _frameCapture, value);
     }
 
     public string? Error
@@ -78,7 +76,7 @@ public sealed class CollectorStatusViewModel : ObservableObject
             CollectorConnectionState.Connected => "Connected",
             _ => "Unavailable",
         };
-        Error = connection.Error ?? snapshot?.Health.LastProviderError;
+        Error = FormatErrors(connection.Error, snapshot?.Health);
 
         if (snapshot is null)
         {
@@ -90,7 +88,9 @@ public sealed class CollectorStatusViewModel : ObservableObject
             .ToString("T");
         Administrator = snapshot.Health.IsAdministrator ? "Yes" : "No";
         PawnIo = FormatPawnIo(snapshot.Health);
-        ForegroundProcess = FormatForegroundProcess(snapshot.Health);
+        FrameCapture = snapshot.Health.IsFrameCaptureActive
+            ? "Active"
+            : "Inactive";
     }
 
     private static string FormatPawnIo(CollectorHealth health)
@@ -106,17 +106,23 @@ public sealed class CollectorStatusViewModel : ObservableObject
             : $"{state} ({health.PawnIoVersion})";
     }
 
-    private static string FormatForegroundProcess(CollectorHealth health) =>
-        health.FrameCaptureState switch
+    private static string? FormatErrors(
+        string? connectionError,
+        CollectorHealth? health)
+    {
+        if (!string.IsNullOrWhiteSpace(connectionError))
         {
-            FrameCaptureState.WaitingForProcess =>
-                "Waiting for a presenting process",
-            FrameCaptureState.WarmingUp => "Warming up",
-            FrameCaptureState.Active when
-                !string.IsNullOrWhiteSpace(health.ForegroundProcess) =>
-                health.ForegroundProcess,
-            FrameCaptureState.Active => "Active",
-            FrameCaptureState.Unavailable => "Unavailable",
-            _ => "Starting",
-        };
+            return connectionError;
+        }
+
+        string[] errors =
+        [
+            .. new[] { health?.PawnIoError, health?.FrameCaptureError }
+                .Where(error => !string.IsNullOrWhiteSpace(error))
+                .Select(error => error!),
+        ];
+        return errors.Length == 0
+            ? null
+            : string.Join(Environment.NewLine, errors);
+    }
 }

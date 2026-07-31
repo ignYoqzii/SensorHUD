@@ -131,28 +131,42 @@ public sealed class SettingsPageViewModel
         IReadOnlyList<MetricDefinition> definitions,
         TelemetrySnapshot? snapshot)
     {
-        var devices = (snapshot?.Readings ?? [])
-            .Where(reading =>
+        var devices = (snapshot?.Instances ?? [])
+            .Where(instance =>
                 MetricRegistry.TryGet(
-                    reading.MetricId,
+                    instance.MetricId,
                     out MetricDefinition definition) &&
                 definition.Category == category.Id &&
                 definition.Scope == MetricScope.PerDevice &&
-                !string.IsNullOrWhiteSpace(reading.DeviceId))
-            .GroupBy(reading => reading.DeviceId!, StringComparer.Ordinal)
+                !string.IsNullOrWhiteSpace(instance.DeviceId))
+            .GroupBy(instance => instance.DeviceId, StringComparer.Ordinal)
             .OrderBy(
-                device => device.First().DeviceName,
+                device => device
+                    .Select(instance => instance.DeviceName)
+                    .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)),
                 StringComparer.CurrentCultureIgnoreCase);
 
         foreach (var device in devices)
         {
-            string deviceName = string.IsNullOrWhiteSpace(
-                device.First().DeviceName)
+            string? declaredName = device
+                .Select(instance => instance.DeviceName)
+                .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name));
+            string deviceName = string.IsNullOrWhiteSpace(declaredName)
                 ? category.Name
-                : device.First().DeviceName!;
+                : declaredName!;
+            HashSet<string> declaredMetrics = new(
+                device.Select(instance => instance.MetricId),
+                StringComparer.Ordinal);
             List<MetricSettingsViewModel> metrics = [.. definitions
+                .Where(definition =>
+                    declaredMetrics.Contains(definition.Id))
                 .Select(definition =>
                     CreateMetric(definition, device.Key))];
+            if (metrics.Count == 0)
+            {
+                continue;
+            }
+
             categories.Add(new MetricCategoryViewModel(
                 $"{category.Name} - {deviceName}",
                 category.Description,
