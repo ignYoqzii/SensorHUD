@@ -29,7 +29,7 @@ internal static class FrameStatistics
             {
                 double milliseconds =
                     (timestamps[index + 1] - timestamps[index]) * 1000;
-                if (milliseconds <= 0)
+                if (!double.IsFinite(milliseconds) || milliseconds <= 0)
                 {
                     continue;
                 }
@@ -38,9 +38,7 @@ internal static class FrameStatistics
                 intervalSum += milliseconds;
             }
 
-            double duration =
-                timestamps[^1] - timestamps[0];
-            if (validCount == 0 || duration <= 0)
+            if (validCount == 0 || !double.IsFinite(intervalSum))
             {
                 return false;
             }
@@ -56,11 +54,12 @@ internal static class FrameStatistics
             }
 
             double slowAverage = slowSum / slowFrameCount;
+            double averageInterval = intervalSum / validCount;
             result = new FrameStatisticsResult(
-                Fps: maximumIntervals / duration,
+                Fps: 1000 / averageInterval,
                 OnePercentLow:
                     slowAverage > 0 ? 1000 / slowAverage : 0,
-                Frametime: intervalSum / validCount);
+                Frametime: averageInterval);
             return true;
         }
         finally

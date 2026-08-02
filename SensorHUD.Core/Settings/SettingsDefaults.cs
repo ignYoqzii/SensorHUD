@@ -8,20 +8,20 @@ namespace SensorHUD.Core.Settings;
 public static class SettingsDefaults
 {
     public const string FileName = "settings.json";
-    public const WidgetLayout LayoutDirection = WidgetLayout.Vertical;
+    public const WidgetLayout LayoutDirection = WidgetLayout.Horizontal;
     public const string HorizontalSeparator = "|";
-    public const double BackgroundOpacity = 0.72;
+    public const double BackgroundOpacity = 0;
     public const double MinimumBackgroundOpacity = 0;
     public const double MaximumBackgroundOpacity = 1;
     public const string FontFamily = "Segoe UI";
-    public const WidgetFontWeight FontWeight = WidgetFontWeight.SemiBold;
-    public const double FontSize = 18;
+    public const WidgetFontWeight FontWeight = WidgetFontWeight.Bold;
+    public const double FontSize = 13;
     public const double MinimumFontSize = 8;
     public const double MaximumFontSize = 72;
     public const WidgetHorizontalAlignment HorizontalTextAlignment =
         WidgetHorizontalAlignment.Left;
     public const WidgetVerticalAlignment VerticalTextAlignment =
-        WidgetVerticalAlignment.Center;
+        WidgetVerticalAlignment.Top;
     public static readonly TimeSpan SaveDebounce =
         TimeSpan.FromMilliseconds(350);
 

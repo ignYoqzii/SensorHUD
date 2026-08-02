@@ -14,9 +14,9 @@ public static partial class MetricRegistry
             Category = MetricCategory.FrameRate,
             Name = "FPS",
             Unit = "FPS",
-            Format = "{name}: {value} {unit}",
+            Format = "{name}: {value}",
             Decimals = 0,
-            TextColor = "#FFFFFFFF",
+            TextColor = "#FFFF2E6C",
             ValueUnitColor = "#FFFFFFFF",
             SortOrder = 0,
         },
@@ -30,6 +30,7 @@ public static partial class MetricRegistry
             Decimals = 0,
             TextColor = "#FFFFFFFF",
             ValueUnitColor = "#FFFFFFFF",
+            IsVisibleByDefault = false,
             SortOrder = 1,
         },
         new()
@@ -42,6 +43,7 @@ public static partial class MetricRegistry
             Decimals = 1,
             TextColor = "#FFFFFFFF",
             ValueUnitColor = "#FFFFFFFF",
+            IsVisibleByDefault = false,
             SortOrder = 2,
         },
         ];

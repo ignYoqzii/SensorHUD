@@ -10,7 +10,7 @@ namespace SensorHUD.Collector.Sampling.DxgEtw;
 /// process-name cache, and frame-capture status. The provider is filtered to
 /// presentation events at the ETW source to minimize graphics-workload cost.
 /// </summary>
-internal sealed class PresentEventMonitor : IDisposable
+internal sealed class PresentEventMonitor : IFrameCaptureSource, IDisposable
 {
     private static readonly double RetentionWindowSeconds =
         FrameCaptureDefaults.RetentionWindow.TotalSeconds;
@@ -19,6 +19,7 @@ internal sealed class PresentEventMonitor : IDisposable
     private readonly Dictionary<int, Queue<double>> _presentsByProcess = [];
     private readonly Dictionary<int, string> _processNameCache = [];
     private readonly List<int> _emptyProcessIds = new(4);
+    private readonly FrameProcessSelector _processSelector;
     private readonly Thread _processingThread;
 
     private TraceEventSession? _session;
@@ -29,6 +30,7 @@ internal sealed class PresentEventMonitor : IDisposable
 
     public PresentEventMonitor()
     {
+        _processSelector = new FrameProcessSelector(IsExcluded);
         _processingThread = new Thread(ProcessEvents)
         {
             IsBackground = true,
@@ -71,22 +73,24 @@ internal sealed class PresentEventMonitor : IDisposable
                 FrameCaptureSessionState.Starting or
                 FrameCaptureSessionState.Unavailable)
             {
-                return new FrameCaptureWindow([]);
+                return FrameCaptureWindow.Empty;
             }
 
-            int? processId = ChooseTargetProcess(
+            int? processId = _processSelector.ChooseTargetProcess(
+                GetForegroundProcessId(),
+                _presentsByProcess,
                 calculationCutoff,
                 out int recentCount);
             if (processId is null)
             {
-                return new FrameCaptureWindow([]);
+                return FrameCaptureWindow.Empty;
             }
 
             double[] timestamps = CopyRecent(
                 _presentsByProcess[processId.Value],
                 calculationCutoff,
                 recentCount);
-            return new FrameCaptureWindow(timestamps);
+            return new FrameCaptureWindow(processId.Value, timestamps);
         }
     }
 
@@ -247,49 +251,6 @@ internal sealed class PresentEventMonitor : IDisposable
         }
     }
 
-    private int? ChooseTargetProcess(
-        double cutoff,
-        out int recentCount)
-    {
-        recentCount = 0;
-        int foregroundProcessId = GetForegroundProcessId();
-        if (foregroundProcessId > 0 &&
-            !IsExcluded(foregroundProcessId) &&
-            _presentsByProcess.TryGetValue(
-                foregroundProcessId,
-                out Queue<double>? foregroundQueue))
-        {
-            int foregroundCount = CountRecent(
-                foregroundQueue,
-                cutoff);
-            if (foregroundCount >= 3)
-            {
-                recentCount = foregroundCount;
-                return foregroundProcessId;
-            }
-        }
-
-        int? bestProcess = null;
-        int bestCount = 2;
-        foreach ((int processId, Queue<double> queue) in _presentsByProcess)
-        {
-            if (IsExcluded(processId))
-            {
-                continue;
-            }
-
-            int count = CountRecent(queue, cutoff);
-            if (count > bestCount)
-            {
-                bestCount = count;
-                bestProcess = processId;
-            }
-        }
-
-        recentCount = bestProcess is null ? 0 : bestCount;
-        return bestProcess;
-    }
-
     private bool IsExcluded(int processId)
     {
         if (processId == Environment.ProcessId)
@@ -314,25 +275,10 @@ internal sealed class PresentEventMonitor : IDisposable
         }
         catch
         {
-            _processNameCache[processId] = string.Empty;
+            // A process can be briefly inaccessible while it starts. Do not
+            // turn that transient lookup failure into a cached exclusion.
             return true;
         }
-    }
-
-    private static int CountRecent(
-        Queue<double> timestamps,
-        double cutoff)
-    {
-        int count = 0;
-        foreach (double timestamp in timestamps)
-        {
-            if (timestamp >= cutoff)
-            {
-                count++;
-            }
-        }
-
-        return count;
     }
 
     private static double[] CopyRecent(
@@ -391,7 +337,11 @@ internal sealed class PresentEventMonitor : IDisposable
 /// Immutable ETW capture passed to the frame calculation layer.
 /// </summary>
 internal readonly record struct FrameCaptureWindow(
-    double[] PresentationTimestamps);
+    int ProcessId,
+    double[] PresentationTimestamps)
+{
+    public static FrameCaptureWindow Empty { get; } = new(0, []);
+}
 
 internal enum FrameCaptureSessionState
 {

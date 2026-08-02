@@ -15,7 +15,7 @@ public static partial class MetricRegistry
             Unit = "ms",
             Format = "{name}: {value} {unit}",
             Decimals = 0,
-            TextColor = "#FFFFFFFF",
+            TextColor = "#FF118FFF",
             ValueUnitColor = "#FFFFFFFF",
             SortOrder = 2,
         },
@@ -29,6 +29,7 @@ public static partial class MetricRegistry
             Decimals = 1,
             TextColor = "#FFFFFFFF",
             ValueUnitColor = "#FFFFFFFF",
+            IsVisibleByDefault = false,
             SortOrder = 3,
         },
         ];

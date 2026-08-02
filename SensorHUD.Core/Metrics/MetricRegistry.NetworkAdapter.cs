@@ -17,6 +17,7 @@ public static partial class MetricRegistry
             Decimals = 1,
             TextColor = "#FFFFFFFF",
             ValueUnitColor = "#FFFFFFFF",
+            IsVisibleByDefault = false,
             SortOrder = 0,
         },
         new()
@@ -29,6 +30,7 @@ public static partial class MetricRegistry
             Decimals = 1,
             TextColor = "#FFFFFFFF",
             ValueUnitColor = "#FFFFFFFF",
+            IsVisibleByDefault = false,
             SortOrder = 1,
         },
         ];
