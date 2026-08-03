@@ -1,5 +1,7 @@
 using System;
+using System.Net.Http;
 using SensorHUD.Core.Settings;
+using SensorHUD.Core.Updates;
 
 namespace SensorHUD.Infrastructure;
 
@@ -9,9 +11,17 @@ namespace SensorHUD.Infrastructure;
 /// </summary>
 internal static class AppServices
 {
+    private static readonly HttpClient UpdateHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(10),
+    };
+
     public static CollectorConnection Collector { get; } = new();
 
     public static WidgetSettingsStore Settings { get; } = new();
+
+    public static GitHubUpdateChecker Updates { get; } =
+        new(UpdateHttpClient);
 
     /// <summary>
     /// Raised with validated settings for immediate in-process preview before

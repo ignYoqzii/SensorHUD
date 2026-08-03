@@ -1,12 +1,17 @@
 using System;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Gaming.XboxGameBar;
 using SensorHUD.Core.Metrics;
 using SensorHUD.Core.Settings;
 using SensorHUD.Core.Telemetry;
+using SensorHUD.Core.Updates;
 using SensorHUD.Infrastructure;
+using Windows.ApplicationModel;
+using Windows.Foundation;
+using Windows.System;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -25,6 +30,7 @@ public sealed partial class SettingsWidgetPage : Page
     private readonly CoreDispatcher _uiDispatcher;
 
     private XboxGameBarWidget? _widget;
+    private CancellationTokenSource? _updateCheckCancellation;
     private string _deviceSignature = string.Empty;
     private volatile bool _isUnloaded;
 
@@ -99,6 +105,105 @@ public sealed partial class SettingsWidgetPage : Page
         RefreshStatus();
     }
 
+    private async void CheckForUpdatesButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_updateCheckCancellation is not null)
+        {
+            return;
+        }
+
+        CancellationTokenSource cancellation = new();
+        _updateCheckCancellation = cancellation;
+        CheckForUpdatesButton.IsEnabled = false;
+        ShowUpdateStatus("Checking for updates…");
+
+        try
+        {
+            PackageVersion packageVersion = Package.Current.Id.Version;
+            Version installedVersion = new(
+                packageVersion.Major,
+                packageVersion.Minor,
+                packageVersion.Build,
+                packageVersion.Revision);
+            UpdateCheckResult result =
+                await AppServices.Updates.CheckAsync(
+                    installedVersion,
+                    cancellation.Token);
+            if (_isUnloaded)
+            {
+                return;
+            }
+
+            if (!result.IsUpdateAvailable)
+            {
+                await DispatchAsync(
+                    () => ShowUpdateStatus("SensorHUD is up to date."));
+                return;
+            }
+
+            IAsyncOperation<bool>? launchOperation = null;
+            await DispatchAsync(() =>
+            {
+                ShowUpdateStatus(
+                    $"Version {FormatReleaseVersion(
+                        result.LatestVersion)} is available. " +
+                    "Opening the download page…");
+                launchOperation = Launcher.LaunchUriAsync(
+                    GitHubUpdateChecker.DownloadPageUri);
+            });
+            if (launchOperation is null)
+            {
+                return;
+            }
+
+            bool launched = await launchOperation;
+            await DispatchAsync(() => ShowUpdateStatus(
+                launched
+                    ? "The download page was opened in your browser."
+                    : "An update is available, but Windows could not open " +
+                      "the download page."));
+        }
+        catch (OperationCanceledException) when (_isUnloaded)
+        {
+            // Widget teardown cancels the optional network request.
+        }
+        catch (Exception)
+        {
+            await DispatchAsync(() => ShowUpdateStatus(
+                "Could not check for updates. Check your Internet " +
+                "connection and try again."));
+        }
+        finally
+        {
+            cancellation.Dispose();
+            if (ReferenceEquals(_updateCheckCancellation, cancellation))
+            {
+                _updateCheckCancellation = null;
+            }
+
+            await DispatchAsync(
+                () => CheckForUpdatesButton.IsEnabled = true);
+        }
+    }
+
+    private void ShowUpdateStatus(string message)
+    {
+        if (_isUnloaded)
+        {
+            return;
+        }
+
+        UpdateStatusText.Text = message;
+        UpdateStatusText.Visibility = Visibility.Visible;
+    }
+
+    private static string FormatReleaseVersion(Version version) =>
+        version.Revision == 0
+            ? version.ToString(3)
+            : version.ToString(4);
+
     private void MetricCategoryButton_Click(
         object sender,
         RoutedEventArgs e)
@@ -158,6 +263,7 @@ public sealed partial class SettingsWidgetPage : Page
         RoutedEventArgs e)
     {
         _isUnloaded = true;
+        _updateCheckCancellation?.Cancel();
         MetricEditor.CloseImmediately();
         _collector.SnapshotReceived -= Collector_SnapshotReceived;
         _collector.StatusChanged -= Collector_StatusChanged;

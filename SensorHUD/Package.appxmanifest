@@ -11,7 +11,7 @@
   <Identity
     Name="yoqzii.SensorHUD"
     Publisher="CN=yoqzii"
-    Version="0.1.2.0" />
+    Version="0.1.3.0" />
 
   <Properties>
     <DisplayName>SensorHUD</DisplayName>
@@ -169,6 +169,8 @@
   </Extensions>
 
   <Capabilities>
+    <!-- Used only for the user-initiated GitHub release check. -->
+    <Capability Name="internetClient" />
     <!-- Required to launch the same-package desktop collector. -->
     <rescap:Capability Name="runFullTrust" />
     <!--

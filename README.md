@@ -106,8 +106,11 @@ version.
 
 ### Update
 
-Download and extract the new release, then run its `Install.cmd`. Windows
-replaces the package while preserving SensorHUD's local settings.
+Select **Check for updates** in the settings widget's **About SensorHUD**
+section. If a newer stable release is available, SensorHUD opens its GitHub
+download page in the default browser. Download and extract the new release,
+then run its `Install.cmd`. Windows replaces the package while preserving
+SensorHUD's local settings.
 
 SensorHUD supports only its current settings schema. An invalid or
 incompatible settings file resets safely to the current defaults.

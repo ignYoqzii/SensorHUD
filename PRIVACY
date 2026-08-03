@@ -1,5 +1,5 @@
 SensorHUD - Privacy Policy
-Last updated: July 29, 2026
+Last updated: August 3, 2026
 
 SensorHUD reads hardware performance information from the local Windows device
 and measures Internet-path stability so it can display that information in an
@@ -11,6 +11,9 @@ Data handling
 - Internet stability measurements send small ICMP echo probes to Cloudflare
   `1.1.1.1` or Google Public DNS `8.8.8.8`. The probes contain no SensorHUD
   readings, device information, account information, or analytics.
+- When the user selects **Check for updates**, the application sends an HTTPS
+  request to GitHub's public releases API. If a newer version is available,
+  it asks Windows to open the SensorHUD release page in the default browser.
 - The application does not transmit telemetry readings or device information
   to the developer or to third parties.
 - The application does not contain advertising, analytics, user accounts, or
