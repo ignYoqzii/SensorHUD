@@ -263,22 +263,15 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Spacing="5">
                             <TextBlock Style="{StaticResource SectionTitleStyle}" Text="About SensorHUD" />
-                            <Grid ColumnSpacing="10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock
-                                    Opacity="0.72"
-                                    Text="{x:Bind ViewModel.VersionText, Mode=OneTime}" />
-                                <TextBlock
-                                    x:Name="UpdateStatusText"
-                                    Grid.Column="1"
-                                    AutomationProperties.LiveSetting="Polite"
-                                    Foreground="{ThemeResource SystemControlHighlightAccentBrush}"
-                                    TextWrapping="Wrap"
-                                    Visibility="Collapsed" />
-                            </Grid>
+                            <TextBlock
+                                Opacity="0.72"
+                                Text="{x:Bind ViewModel.VersionText, Mode=OneTime}" />
+                            <TextBlock
+                                x:Name="UpdateStatusText"
+                                AutomationProperties.LiveSetting="Polite"
+                                Foreground="{ThemeResource SystemControlHighlightAccentBrush}"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
                             <TextBlock Style="{StaticResource SectionDescriptionStyle}" Text="A customizable local PC telemetry overlay for Xbox Game Bar." />
                             <TextBlock Style="{StaticResource SectionDescriptionStyle}" Text="{x:Bind ViewModel.CopyrightText, Mode=OneTime}" />
                         </StackPanel>

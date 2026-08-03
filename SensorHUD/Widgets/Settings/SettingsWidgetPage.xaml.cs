@@ -11,7 +11,6 @@ using SensorHUD.Core.Updates;
 using SensorHUD.Infrastructure;
 using Windows.ApplicationModel;
 using Windows.Foundation;
-using Windows.System;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -118,6 +117,7 @@ public sealed partial class SettingsWidgetPage : Page
         _updateCheckCancellation = cancellation;
         CheckForUpdatesButton.IsEnabled = false;
         ShowUpdateStatus("Checking for updates…");
+        bool updateAvailable = false;
 
         try
         {
@@ -143,6 +143,7 @@ public sealed partial class SettingsWidgetPage : Page
                 return;
             }
 
+            updateAvailable = true;
             IAsyncOperation<bool>? launchOperation = null;
             await DispatchAsync(() =>
             {
@@ -150,11 +151,14 @@ public sealed partial class SettingsWidgetPage : Page
                     $"Version {FormatReleaseVersion(
                         result.LatestVersion)} is available. " +
                     "Opening the download page…");
-                launchOperation = Launcher.LaunchUriAsync(
+                launchOperation = _widget?.LaunchUriAsync(
                     GitHubUpdateChecker.DownloadPageUri);
             });
             if (launchOperation is null)
             {
+                await DispatchAsync(() => ShowUpdateStatus(
+                    "An update is available, but Game Bar could not open " +
+                    "the download page."));
                 return;
             }
 
@@ -172,8 +176,11 @@ public sealed partial class SettingsWidgetPage : Page
         catch (Exception)
         {
             await DispatchAsync(() => ShowUpdateStatus(
-                "Could not check for updates. Check your Internet " +
-                "connection and try again."));
+                updateAvailable
+                    ? "An update is available, but Game Bar could not open " +
+                      "the download page."
+                    : "Could not check for updates. Check your Internet " +
+                      "connection and try again."));
         }
         finally
         {
